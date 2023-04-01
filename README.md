@@ -1,2 +1,2 @@
 # RLanimals
-Reinforcement Learning somulator in Rust
+Reinforcement Learning simulator of carnivoresand herbivores in Rust
