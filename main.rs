@@ -1,13 +1,25 @@
 use std::{thread};
 
-
 mod server;
+mod beast_traits;
 mod herbivore;
 
+use beast_traits::Beast;
+use herbivore::Herbivore;
+
+const FPS: i32 = 1;
+const DELAY: i32 = 1000/FPS;
+const MAPSIZE: i32 = 100;
 
 fn main(){
 
+    //init
+    let vb: Vec<Box<dyn Beast>> = Vec::new(); 
+    
+
+
     //start server
+    thread::spawn(|| {server::main()});
     /*thread::spawn(||{
         for i in 1..10{
             println!("{} from thread", i);
@@ -19,12 +31,20 @@ fn main(){
         println!("{} from main", i);
         thread::sleep(Duration::from_millis(2));
     }*/
-    thread::spawn(|| {server::main()});
 
-    thread::spawn(|| {herbivore::main()});
+    //thread::spawn(|| {herbivore::main("1".to_owned())});
+
+    let b1 = Herbivore::new("test".to_owned(), (1,1), MAPSIZE);
+    thread::spawn(|| {herbivore::main(b1, DELAY)}); 
+
+    let b2 = Herbivore::new("test2".to_owned(), (2,2), MAPSIZE);
+    thread::spawn(|| {herbivore::main(b2, DELAY)});
+
+
 
     //loop
     loop{
+
         //init
 
 
@@ -41,11 +61,10 @@ fn main(){
 
 
         //save
-
-
-
     }
+}
 
-
+fn take_beast(b: &dyn Beast) {
+    //let vb::push(b);
 }
 
