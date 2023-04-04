@@ -11,12 +11,19 @@ pub struct Herbivore {
     pos: (i32,i32),
     dir: i32,
     speed: i32,
+    energy: i32,
     mapsize: i32,
 }
 
 impl Herbivore {
     pub fn new(id: String, pos: (i32,i32), mapsize: i32) -> Herbivore {
-        Herbivore {id: id, pos: pos, dir: 0, speed: 0, mapsize: mapsize}
+        Herbivore {
+            id: id, 
+            pos: pos, 
+            dir: 0, 
+            speed: 0, 
+            energy: 100, 
+            mapsize: mapsize}
     }
 }
 
@@ -39,6 +46,8 @@ impl Beast for Herbivore {
     fn get_dir(&self) -> i32 {
         self.dir.clone()
     }
+
+
 }
 
 
