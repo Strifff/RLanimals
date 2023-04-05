@@ -21,5 +21,9 @@ pub trait Beast{
     fn right(&mut self);
     fn back(&mut self);
 
+    fn consume_energy(&mut self);
+
     fn in_bounds(&self, x: f32, y: f32)     -> (f32,f32);
+
+    fn dead(&mut self);
 }

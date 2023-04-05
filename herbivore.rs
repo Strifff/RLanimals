@@ -1,29 +1,27 @@
-//mod test_traits;
-//use test_traits::Beast;
-
-
 use beast_traits::Beast;
 
 use std::{thread, time::Duration, convert::TryInto};
 
 pub struct Herbivore {
     id: String,
+    alive: bool,
     pos: (f32,f32),
     dir: i32,
     speed: i32,
     fov: i32,
-    energy: i32,
+    energy: f32,
     mapsize: i32,
 }
 
 impl Herbivore {
     pub fn new(id: String, pos: (f32,f32), fov: i32, mapsize: i32) -> Herbivore {
         Herbivore {
-            id: id, 
+            id: id,
+            alive: true,
             pos: pos, 
             dir: 45, 
             speed: 0, 
-            energy: 100,
+            energy: 100.0,
             fov: fov,
             mapsize: mapsize}
     }
@@ -61,12 +59,12 @@ impl Beast for Herbivore {
     fn get_speed(&self) -> i32 {
         self.speed.clone()
     }
-
     fn forward(&mut self) {
         let x = self.pos.0 + (self.speed as f32)*((self.dir as f32 *3.141593/180.0) as f32).cos();
         let y = self.pos.1 + (self.speed as f32)*((self.dir as f32 *3.141593/180.0) as f32).sin();
 
-        self.pos = self.in_bounds(x,y); 
+        self.pos = self.in_bounds(x,y);
+        let _ = self.consume_energy();
     }
     fn left(&mut self) {
         self.dir = (self.dir+15)%360;
@@ -77,10 +75,15 @@ impl Beast for Herbivore {
         let _ = &self.forward();
     }
     fn back(&mut self) {
-        let x = self.pos.0 - (self.speed as f32)*(self.dir as f32).cos();
-        let y = self.pos.1 - (self.speed as f32)*(self.dir as f32).sin();
-        
-        self.pos = self.in_bounds(x,y); 
+        let save_speed = self.speed;
+        self.speed = -1;
+        let _ = self.forward();
+        self.speed = save_speed;
+    }
+    fn consume_energy(&mut self) {
+        let speed: f32 = self.speed as f32;
+        self.energy = self.energy - speed*speed/2.0;
+        let _ = self.dead();
     }
     fn in_bounds(&self, x: f32, y: f32) -> (f32,f32) {
         let vec: Vec<f32> = vec![x,y].into_iter().map(|val| 
@@ -94,31 +97,24 @@ impl Beast for Herbivore {
         
         (vec[0],vec[1])
     }
+    fn dead(&mut self) {
+        if self.energy < 0.0 {
+            self.alive = false
+        }
+    }
 }
 
 pub fn main(mut h: Herbivore, delay: i32) {
 
     h.set_speed3();
 
-    loop{
-        println!("id: {:?}, pos: {:?}, dir: {:?}", h.get_id(), h.get_pos(), h.get_dir());
+    while h.alive {
+        //take action
 
+        //update main
+        println!("id: {:?}, pos: {:?}, energy: {:?}", h.get_id(), h.get_pos(), h.energy);
         h.left();
-
         thread::sleep(Duration::from_millis(delay.try_into().unwrap()));
-
     }
-
-    /*let new_name: String = format!("{}-1",h.get_id());
-    if new_name.len() > 10 {
-        loop{
-            thread::sleep(Duration::from_millis(delay.try_into().unwrap()));
-            //println!("id: {:?},", h.get_id());
-        }
-
-    } else {
-        let nh: Herbivore = Herbivore::new(new_name, (1.1,1.1), h.fov.clone(), h.mapsize.clone());
-        thread::spawn(move || {main(nh, delay)});
-        
-    }*/    
+    println!("{:?} is dead", h.get_id());   
 }
