@@ -16,14 +16,17 @@ Brief documentation of what has been achieved and how the code works.
 Beast is the parent trait of herbivores and carnivores and containts the 
 functions and structs common for both classes of animal.
 
-Beasts can:
+Beasts can inherently:
 - See with varying FOV
+- Eat
+- Die
+
+Beasts can do discrete actions:
+- Set speed
 - Move foreward
 - Turn left
 - Turn right
 - Reverse at reduced speed
-- Eat
-- Die
 
 To goal of a beast is to survive and reproduce by eating food. When enough food 
 is eaten, they spawn a child with a slight random modification in physical 

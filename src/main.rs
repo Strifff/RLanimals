@@ -5,7 +5,7 @@ mod beast_traits;
 mod herbivore;
 
 use herbivore::Herbivore;
-//use beast_traits::Beast;
+use crate::beast_traits::Beast;
 
 const FPS: i32 = 10;
 const DELAY: i32 = 1000/FPS;
@@ -22,7 +22,7 @@ fn main(){
     //start server
     thread::spawn(|| {server::main()});
 
-    let b1 = Herbivore::new("test".to_owned(), (50.0,50.0), FOV, MAPSIZE);
+    let b1 = Herbivore::new("test".to_owned(), (50.0,50.0), FOV, 1.0, MAPSIZE);
     thread::spawn(|| {herbivore::main(b1, DELAY)}); 
 
     //vb.push(Box::new(b1));
@@ -48,7 +48,8 @@ fn main(){
     }
 }
 
-/*fn take_beast(b: &dyn Beast) {
-    //let vb::push(b);
-}*/
+fn take_beast(b: &impl Beast) {
+    //println!("test");
+    println!("id: {:?}, pos: {:?}", b.get_id(), b.get_pos());
+}
 

@@ -2,7 +2,6 @@ use std::net::{TcpListener, TcpStream};
 use std::io::prelude::*;
 use std::fs;
 
-
 pub fn main(){
     let listener = TcpListener::bind("127.0.0.1:7878").unwrap();
 
@@ -27,7 +26,7 @@ fn handle_conenction(mut stream: TcpStream){
         ("HTTP/1.1 404 NOT FOUND", "404.html")
     };
 
-    let path = format!("src/pages/{}",filename);
+    let path = format!("src/webpages/{}",filename);
     let contents = fs::read_to_string(path).unwrap();
 
     let response = format!(
