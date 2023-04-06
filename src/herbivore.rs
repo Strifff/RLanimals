@@ -60,8 +60,9 @@ impl Beast for Herbivore {
         self.speed.clone()
     }
     fn forward(&mut self) {
-        let x = self.pos.0 + (self.speed as f32)*((self.dir as f32 *3.141593/180.0) as f32).cos();
-        let y = self.pos.1 + (self.speed as f32)*((self.dir as f32 *3.141593/180.0) as f32).sin();
+        let dir_rad: f32 = self.dir as f32 *3.141593/180.0;
+        let x = self.pos.0 + (self.speed as f32)*dir_rad.cos();
+        let y = self.pos.1 + (self.speed as f32)*dir_rad.sin();
 
         self.pos = self.in_bounds(x,y);
         let _ = self.consume_energy();
