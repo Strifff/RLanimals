@@ -1,1 +1,0 @@
-/Users/axelsolhall/Rust/RLanimals/BeastSim/target/debug/BeastSim: /Users/axelsolhall/Rust/RLanimals/BeastSim/src/beast_traits.rs /Users/axelsolhall/Rust/RLanimals/BeastSim/src/herbivore.rs /Users/axelsolhall/Rust/RLanimals/BeastSim/src/main.rs /Users/axelsolhall/Rust/RLanimals/BeastSim/src/server.rs
