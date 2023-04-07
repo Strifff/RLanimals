@@ -1,4 +1,4 @@
-use std::{thread};
+use std::{thread, time::Duration};
 
 mod server;
 mod beast_traits;
@@ -28,30 +28,44 @@ fn main(){
 
     let (tx, rx) = mpsc::channel::<Msg>();
 
-    let tx_clone = tx.clone();
-
     let b1 = Herbivore::new(
         "test".to_owned(),
         (50.0,50.0), 
         FOV,
         2.0, 
         MAPSIZE,
-        tx_clone,
+        tx.clone(),
     );
 
     thread::spawn(|| {herbivore::main(b1, DELAY)}); 
+
+    let b2 = Herbivore::new(
+        "test2".to_owned(),
+        (50.0,50.0), 
+        FOV,
+        1.0, 
+        MAPSIZE,
+        tx.clone(),
+    );
+
+    thread::spawn(|| {herbivore::main(b2, DELAY)}); 
 
     //vb.push(Box::new(b1));
     //loop
     loop{
         // receive beast states
-        for received in &rx {
-            println!("received from {:?}", received.id);
+        let mut received = &rx;
+        for msg in received.try_iter() {
+            println!("received from {:?}, pos: {:?}", msg.id, msg.pos);
         }
+        println!("loop ended");
 
         // update world
 
         // share world
+
+        // delay
+        thread::sleep(Duration::from_millis(1000));
 
     }
 }

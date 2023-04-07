@@ -157,14 +157,19 @@ pub fn main(mut h: Herbivore, delay: i32) {
         h.left();
 
         //update main
-        msg.pos = &(h.get_pos());
-        //msg.dir = h.get_dir();
-        //msg.speed = h.get_speed();
+        let mut msg = Msg{
+            id:     h.get_id(),
+            beast:  "Herbivore".to_owned(),
+            pos:    h.get_pos(),
+            dir:    h.get_dir(),
+            speed:  h.get_speed(),
+        };
 
-        h.receiver.send(msg);
+        h.receiver.send(msg).unwrap();
 
         //delay
-        thread::sleep(Duration::from_millis(delay.try_into().unwrap()));
+        //thread::sleep(Duration::from_millis(delay.try_into().unwrap()));
+        thread::sleep(Duration::from_millis(100));
 
         //DEBUG
         //println!("id: {:?}, pos: {:?}, energy: {:?}", h.get_id(), h.get_pos(), h.energy);
