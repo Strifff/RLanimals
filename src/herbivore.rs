@@ -1,10 +1,13 @@
 use crate::beast_traits::Beast;
 
-use std::{thread, time::Duration, convert::TryInto};
+
+use std::{thread, time::Duration, convert::TryInto, collections::HashMap};
 
 use crate::import_beast;
-use crate::conc::Msg;
+use crate::conc::{Msg, BeastUpdate};
 use crate::mpsc::{Sender,Receiver};
+use std::sync::{Arc, Mutex, mpsc};
+use arc_swap::ArcSwap;
 
 pub struct Herbivore {
     id: String,
@@ -17,7 +20,7 @@ pub struct Herbivore {
     energy: f64,
     mapsize: i32,
     receiver: Sender<Msg>,
-    //world: <'a>::&mut Vec<&'a ((f64, f64), String, String, i32, f64)>,
+    //world: &'static ArcSwap<Vec<((f64, f64), String, String, i32, f64)>>,
 }
 
 impl Herbivore {
@@ -28,7 +31,7 @@ impl Herbivore {
         speed: f64, 
         mapsize: i32,
         receiver: Sender<Msg>,
-        //world: &mut Vec<((f64, f64), String, String, i32, f64)>,
+       // world: &'static ArcSwap<Vec<((f64, f64), String, String, i32, f64)>>,
     ) -> Herbivore {
 
         Herbivore {
@@ -38,7 +41,7 @@ impl Herbivore {
             dir: 0, //todo rng
             speed_base: speed,
             speed_curr: speed,
-            energy: 100.0,
+            energy: 10000000000.0,
             fov: fov,
             mapsize: mapsize,
             receiver: receiver,
@@ -120,7 +123,7 @@ impl Beast for Herbivore {
     }
     fn starve(&mut self) {
         if self.energy < 0.0 {
-            self.alive = false;
+            self.alive = true;
         }
     }
     fn kill(&mut self) -> bool {
@@ -137,6 +140,11 @@ pub fn main(mut h: Herbivore, delay: i32) {
     //h.set_speed3();
     import_beast(&h);
 
+    let (tx, rx) = mpsc::channel::<BeastUpdate>();
+    let receiver = tx.clone();
+
+    let mut world: Vec<((f64, f64), String, String, i32, f64, Sender<BeastUpdate>)> = Vec::new();
+
     while h.alive {
 
 
@@ -147,6 +155,17 @@ pub fn main(mut h: Herbivore, delay: i32) {
         }
         x += 1;*/
         //pull main 
+        let received = &rx;
+ 
+        world.clear();
+        for msg in received.try_iter() {
+            world = msg.world;
+            if h.get_id() == "test2" {
+                for entry in &world {
+                    println!("Entry: {:?}", entry)
+                }
+            }
+        }
 
 
         //take action
@@ -159,11 +178,13 @@ pub fn main(mut h: Herbivore, delay: i32) {
             pos:    h.get_pos(),
             dir:    h.get_dir(),
             speed:  h.get_speed(),
+            handle: receiver.clone(),
         };
 
         h.receiver.send(msg).unwrap();
 
         //delay
+        
         thread::sleep(Duration::from_millis(delay.try_into().unwrap()));
 
         //DEBUG
