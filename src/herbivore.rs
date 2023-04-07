@@ -2,22 +2,33 @@ use crate::beast_traits::Beast;
 
 use std::{thread, time::Duration, convert::TryInto};
 
-use crate::take_beast;
+use crate::import_beast;
+use crate::conc::Msg;
+use crate::mpsc::{Sender,Receiver};
 
 pub struct Herbivore {
     id: String,
     alive: bool,
-    pos: (f32,f32),
+    pos: (f64,f64),
     dir: i32,
-    speed_base: f32,
-    speed_curr: f32,
+    speed_base: f64,
+    speed_curr: f64,
     fov: i32,
-    energy: f32,
+    energy: f64,
     mapsize: i32,
+    receiver: Sender<Msg>,
 }
 
 impl Herbivore {
-    pub fn new(id: String, pos: (f32,f32), fov: i32, speed: f32, mapsize: i32) -> Herbivore {
+    pub fn new(
+        id: String, 
+        pos: (f64,f64), 
+        fov: i32, 
+        speed: f64, 
+        mapsize: i32,
+        receiver: Sender<Msg>,
+    ) -> Herbivore {
+
         Herbivore {
             id: id,
             alive: true,
@@ -27,7 +38,9 @@ impl Herbivore {
             speed_curr: speed,
             energy: 100.0,
             fov: fov,
-            mapsize: mapsize}
+            mapsize: mapsize,
+            receiver: receiver,
+        }
     }
 }
 
@@ -38,10 +51,10 @@ impl Beast for Herbivore {
     fn get_id(&self) -> String {
         self.id.clone()
     }
-    fn set_pos(&mut self, pos: (f32,f32)) {
+    fn set_pos(&mut self, pos: (f64,f64)) {
         self.pos = pos;
     }
-    fn get_pos(&self) -> (f32,f32) {
+    fn get_pos(&self) -> (f64,f64) {
         self.pos.clone()
     }
     fn set_dir(&mut self, dir: i32) {
@@ -55,16 +68,16 @@ impl Beast for Herbivore {
         self.speed_curr = self.speed_base;
     }
     fn set_speed2(&mut self) {
-        self.speed_curr = self.speed_base * 2 as f32;
+        self.speed_curr = self.speed_base * 2 as f64;
     }
     fn set_speed3(&mut self) {
-        self.speed_curr = self.speed_base * 3 as f32;
+        self.speed_curr = self.speed_base * 3 as f64;
     }
-    fn get_speed(&self) -> f32 {
+    fn get_speed(&self) -> f64 {
         self.speed_curr.clone()
     }
     fn forward(&mut self) {
-        let dir_rad: f32 = self.dir as f32 *3.141593/180.0;
+        let dir_rad: f64 = self.dir as f64 *3.141593/180.0;
         let x = self.pos.0 + self.speed_curr * dir_rad.cos();
         let y = self.pos.1 + self.speed_curr * dir_rad.sin();
 
@@ -86,18 +99,18 @@ impl Beast for Herbivore {
         self.speed_curr = save_speed;
     }
     fn consume_energy(&mut self) {
-        let speed: f32 = self.speed_curr;
+        let speed: f64 = self.speed_curr;
         self.energy = self.energy - speed * speed / 2.0;
         self.starve();
     }
-    fn in_bounds(&self, x: f32, y: f32) -> (f32,f32) {
-        let vec: Vec<f32> = vec![x,y].into_iter().map(|val| 
-            {if val > self.mapsize as f32 {
-                self.mapsize.clone() as f32
-            } else if val < 0 as f32 {
-                0 as f32
+    fn in_bounds(&self, x: f64, y: f64) -> (f64,f64) {
+        let vec: Vec<f64> = vec![x,y].into_iter().map(|val| 
+            {if val > self.mapsize as f64 {
+                self.mapsize.clone() as f64
+            } else if val < 0 as f64 {
+                0 as f64
             } else { 
-                val as f32
+                val as f64
             }}).collect();
         
         (vec[0],vec[1])
@@ -107,26 +120,57 @@ impl Beast for Herbivore {
             self.alive = false;
         }
     }
-    fn kill(&mut self) {
-        self.alive = false;
+    fn kill(&mut self) -> bool {
+        if self.alive {
+            self.alive = false;
+            return true;
+        }
+        false
     }
 }
 
 pub fn main(mut h: Herbivore, delay: i32) {
 
     //h.set_speed3();
+    import_beast(&h);
+
+    let mut msg = Msg{
+        id:     h.get_id(),
+        beast:  "Herbivore".to_owned(),
+        pos:    h.get_pos(),
+        dir:    h.get_dir(),
+        speed:  h.get_speed(),
+    };
 
     while h.alive {
+
+
+        /*if x == 10 && h.get_id() == "test" {
+            let b1 = Herbivore::new("test-----".to_owned(), (50.0,50.0), h.fov, 1.0, h.mapsize);
+            thread::spawn(move || {main(b1, delay)}); 
+
+        }
+        x += 1;*/
         //pull main 
 
         //take action
+        h.left();
 
         //update main
-        take_beast(&h);
+        msg.pos = &(h.get_pos());
+        //msg.dir = h.get_dir();
+        //msg.speed = h.get_speed();
 
-        //println!("id: {:?}, pos: {:?}, energy: {:?}", h.get_id(), h.get_pos(), h.energy);
-        h.left();
+        h.receiver.send(msg);
+
+        //delay
         thread::sleep(Duration::from_millis(delay.try_into().unwrap()));
+
+        //DEBUG
+        //println!("id: {:?}, pos: {:?}, energy: {:?}", h.get_id(), h.get_pos(), h.energy);
+ 
     }
+
+    //after death
     println!("{:?} died", h.get_id()); //todo cause of death 
 }
