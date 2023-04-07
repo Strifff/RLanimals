@@ -17,6 +17,7 @@ pub struct Herbivore {
     energy: f64,
     mapsize: i32,
     receiver: Sender<Msg>,
+    //world: <'a>::&mut Vec<&'a ((f64, f64), String, String, i32, f64)>,
 }
 
 impl Herbivore {
@@ -27,6 +28,7 @@ impl Herbivore {
         speed: f64, 
         mapsize: i32,
         receiver: Sender<Msg>,
+        //world: &mut Vec<((f64, f64), String, String, i32, f64)>,
     ) -> Herbivore {
 
         Herbivore {
@@ -40,6 +42,7 @@ impl Herbivore {
             fov: fov,
             mapsize: mapsize,
             receiver: receiver,
+            //world: world,
         }
     }
 }
@@ -134,14 +137,6 @@ pub fn main(mut h: Herbivore, delay: i32) {
     //h.set_speed3();
     import_beast(&h);
 
-    let mut msg = Msg{
-        id:     h.get_id(),
-        beast:  "Herbivore".to_owned(),
-        pos:    h.get_pos(),
-        dir:    h.get_dir(),
-        speed:  h.get_speed(),
-    };
-
     while h.alive {
 
 
@@ -152,6 +147,7 @@ pub fn main(mut h: Herbivore, delay: i32) {
         }
         x += 1;*/
         //pull main 
+
 
         //take action
         h.left();
@@ -168,8 +164,7 @@ pub fn main(mut h: Herbivore, delay: i32) {
         h.receiver.send(msg).unwrap();
 
         //delay
-        //thread::sleep(Duration::from_millis(delay.try_into().unwrap()));
-        thread::sleep(Duration::from_millis(100));
+        thread::sleep(Duration::from_millis(delay.try_into().unwrap()));
 
         //DEBUG
         //println!("id: {:?}, pos: {:?}, energy: {:?}", h.get_id(), h.get_pos(), h.energy);
