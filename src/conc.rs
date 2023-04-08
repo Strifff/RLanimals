@@ -1,5 +1,5 @@
-use crate::beast_traits::Beast;
-use crate::mpsc::{Sender,Receiver};
+//use crate::beast_traits::Beast;
+use crate::mpsc::{Sender/*,Receiver*/};
 pub struct Msg {
     pub id: String,
     pub beast: String,
@@ -13,3 +13,5 @@ pub struct BeastUpdate {
     pub kill: bool,
     pub world: Vec<((f64, f64), String, String, i32, f64, Sender<BeastUpdate>)>, 
 }
+
+//todo impl Msg for many msg types

@@ -1,7 +1,7 @@
 use crate::beast_traits::Beast;
 
 
-use std::{thread, time::Duration, convert::TryInto, collections::HashMap};
+use std::{cmp::Ordering, thread, time::Duration, convert::TryInto, collections::HashMap};
 
 use crate::import_beast;
 use crate::conc::{Msg, BeastUpdate};
@@ -41,7 +41,7 @@ impl Herbivore {
             dir: 0, //todo rng
             speed_base: speed,
             speed_curr: speed,
-            energy: 10000000000.0,
+            energy: 100.0,
             fov: fov,
             mapsize: mapsize,
             receiver: receiver,
@@ -121,9 +121,12 @@ impl Beast for Herbivore {
         
         (vec[0],vec[1])
     }
+    fn get_fov(&self) -> i32 {
+        self.fov
+    }
     fn starve(&mut self) {
         if self.energy < 0.0 {
-            self.alive = true;
+            self.alive = false;
         }
     }
     fn kill(&mut self) -> bool {
@@ -160,15 +163,32 @@ pub fn main(mut h: Herbivore, delay: i32) {
         world.clear();
         for msg in received.try_iter() {
             world = msg.world;
-            if h.get_id() == "test2" {
+            /*if h.get_id() == "test2" {
                 for entry in &world {
                     println!("Entry: {:?}", entry)
                 }
-            }
+            }*/
+        }
+
+        //take action
+        /*println!("before");
+        for entry in &world {
+            println!("entry: {:?}", entry)
+        }*/
+        world.retain(|(pos,id,_,_,_,_)| 
+            in_view(&h, *pos)
+            && *id != h.get_id());
+
+        //println!("after");
+        println!("self: {:?}, dir: {:?}, pos: {:?}",h.get_id(), h.get_dir(), h.get_pos());
+        for entry in &world {
+            println!("in view: {:?}, from pov: {:?}", entry, h.get_id())
+
         }
 
 
-        //take action
+
+
         h.left();
 
         //update main
@@ -194,4 +214,56 @@ pub fn main(mut h: Herbivore, delay: i32) {
 
     //after death
     println!("{:?} died", h.get_id()); //todo cause of death 
+    //todo signal mail for removal
 }
+
+fn in_view(b: &impl Beast, point: (f64, f64)) -> bool {
+    let pos_self = b.get_pos();
+    let fov = b.get_fov();
+
+    let dir = b.get_dir();
+
+    let left_dir_rad: f64 = (dir+fov/2%180) as f64 *3.141593/180.0;
+    let right_dir_rad: f64 = (dir-fov/2%180) as f64 *3.141593/180.0;
+    
+    let left_slope = left_dir_rad.tan();
+    let right_slope = right_dir_rad.tan();
+
+    println!("left: {:?}, right: {:?}", left_slope, right_slope);
+
+    //left bound
+    let left = if dir + fov/2 <= 90 || dir + fov/2 > 270 {
+        // below line
+        point_above_line(pos_self, left_slope, point)
+    } else {
+        //above line
+        !point_above_line(pos_self, left_slope, point)
+    };
+
+    //right bound
+    let right = if dir - fov/2 <= 90 || dir - fov/2 > 270 {
+        //above line
+        !point_above_line(pos_self, right_slope, point)
+    } else {
+        //below line
+        point_above_line(pos_self, right_slope, point)
+    };
+
+    //distance
+    let distance: bool = if true {
+        //todo distance=f(fov)
+        true
+    } else {
+        false
+    };
+
+    left && right //&& distance
+}
+
+fn point_above_line((x,y): (f64, f64), slope: f64, point: (f64, f64)) -> bool {
+    // y = k*x + m
+    let m = y - slope*x;
+
+    point.0 * slope + m > point.1
+}
+
