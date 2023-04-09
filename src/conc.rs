@@ -2,6 +2,7 @@
 use crate::mpsc::{Sender/*,Receiver*/};
 pub struct Msg {
     pub id: String,
+    pub alive: bool,
     pub beast: String,
     pub pos: (f64, f64),
     pub dir: i32,

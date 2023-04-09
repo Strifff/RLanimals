@@ -8,6 +8,7 @@ mod conc;
 use std::sync::{/*Arc, Mutex,*/mpsc};
 use crate::mpsc::{Sender/*,Receiver*/};
 
+use egui::Context;
 use herbivore::Herbivore;
 use crate::beast_traits::Beast;
 use crate::conc::{Msg, BeastUpdate};
@@ -66,7 +67,11 @@ fn main(){
         let received = &rx;
  
         for msg in received.try_iter() {
-            world.insert(msg.id, (msg.beast, msg.pos, msg.dir, msg.speed, msg.handle));
+            if msg.alive {
+                world.insert(msg.id, (msg.beast, msg.pos, msg.dir, msg.speed, msg.handle));
+            } else {
+                let _ = world.remove(&msg.id);
+            }
         }
 
         // update world
@@ -87,11 +92,11 @@ fn main(){
                 kill: false,
                 world: world_reverse.clone()
             };
-            handle.send(msg).unwrap();
+            let _ = handle.send(msg).unwrap();
         }
 
         // plot
-        plot(&world);
+        plot(&world, &ctx);
 
 
         // delay
@@ -105,10 +110,12 @@ fn import_beast(b: &impl Beast) {
     println!("id: {:?}, pos: {:?}", b.get_id(), b.get_pos());
 }
 
-fn plot(world: &HashMap<String, (String, (f64, f64), i32, f64, Sender<BeastUpdate>)>) {
+fn plot(world: &HashMap<String, (String, (f64, f64), i32, f64, Sender<BeastUpdate>)>, ctx: &Context) {
+    println!("world");
     for key in world.keys() {
         let entry = world.get(key).unwrap();
-
+        println!("entry: {:?}", entry);
     }
+
 }
 

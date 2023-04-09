@@ -184,6 +184,7 @@ pub fn main(mut h: Herbivore, delay: i32) {
         //update main
         let msg = Msg{
             id:     h.get_id(),
+            alive:  true,
             beast:  "Herbivore".to_owned(),
             pos:    h.get_pos(),
             dir:    h.get_dir(),
@@ -204,7 +205,18 @@ pub fn main(mut h: Herbivore, delay: i32) {
 
     //after death
     println!("{:?} died", h.get_id()); //todo cause of death 
-    //todo signal mail for removal
+    let msg = Msg{
+        id:     h.get_id(),
+        alive:  false,
+        beast:  "Herbivore".to_owned(),
+        pos:    h.get_pos(),
+        dir:    h.get_dir(),
+        speed:  h.get_speed(),
+        handle: receiver.clone(),
+    };
+
+    h.receiver.send(msg).unwrap();
+
 }
 
 fn in_view(b: &impl Beast, point: (f64, f64)) -> bool {
@@ -219,7 +231,7 @@ fn in_view(b: &impl Beast, point: (f64, f64)) -> bool {
     let left_slope = left_dir_rad.tan();
     let right_slope = right_dir_rad.tan();
 
-    println!("left: {:?}, right: {:?}", left_slope, right_slope);
+    //println!("left: {:?}, right: {:?}", left_slope, right_slope);
 
     //left bound
     let left = if dir + fov/2 <= 90 || dir + fov/2 > 270 {
