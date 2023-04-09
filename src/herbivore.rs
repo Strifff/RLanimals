@@ -1,13 +1,13 @@
 use crate::beast_traits::Beast;
 
 
-use std::{cmp::Ordering, thread, time::Duration, convert::TryInto, collections::HashMap};
+use std::{/*cmp::Ordering,*/ thread, time::Duration, convert::TryInto};
 
 use crate::import_beast;
 use crate::conc::{Msg, BeastUpdate};
-use crate::mpsc::{Sender,Receiver};
-use std::sync::{Arc, Mutex, mpsc};
-use arc_swap::ArcSwap;
+use crate::mpsc::{Sender/*,Receiver*/};
+use std::sync::{/*Arc, Mutex,*/ mpsc};
+//use arc_swap::ArcSwap;
 
 pub struct Herbivore {
     id: String,
@@ -72,12 +72,15 @@ impl Beast for Herbivore {
 
     fn set_speed1(&mut self) {
         self.speed_curr = self.speed_base;
+        self.forward();
     }
     fn set_speed2(&mut self) {
         self.speed_curr = self.speed_base * 2 as f64;
+        self.forward();
     }
     fn set_speed3(&mut self) {
         self.speed_curr = self.speed_base * 3 as f64;
+        self.forward();
     }
     fn get_speed(&self) -> f64 {
         self.speed_curr.clone()
@@ -163,36 +166,23 @@ pub fn main(mut h: Herbivore, delay: i32) {
         world.clear();
         for msg in received.try_iter() {
             world = msg.world;
-            /*if h.get_id() == "test2" {
-                for entry in &world {
-                    println!("Entry: {:?}", entry)
-                }
-            }*/
+            //todo only work on last msg
         }
 
         //take action
-        /*println!("before");
-        for entry in &world {
-            println!("entry: {:?}", entry)
-        }*/
         world.retain(|(pos,id,_,_,_,_)| 
             in_view(&h, *pos)
             && *id != h.get_id());
 
-        //println!("after");
-        println!("self: {:?}, dir: {:?}, pos: {:?}",h.get_id(), h.get_dir(), h.get_pos());
-        for entry in &world {
+        /*for entry in &world {
             println!("in view: {:?}, from pov: {:?}", entry, h.get_id())
 
-        }
-
-
-
+        }*/
 
         h.left();
 
         //update main
-        let mut msg = Msg{
+        let msg = Msg{
             id:     h.get_id(),
             beast:  "Herbivore".to_owned(),
             pos:    h.get_pos(),
@@ -234,19 +224,19 @@ fn in_view(b: &impl Beast, point: (f64, f64)) -> bool {
     //left bound
     let left = if dir + fov/2 <= 90 || dir + fov/2 > 270 {
         // below line
-        point_above_line(pos_self, left_slope, point)
+        !point_above_line(pos_self, left_slope, point)
     } else {
         //above line
-        !point_above_line(pos_self, left_slope, point)
+        point_above_line(pos_self, left_slope, point)
     };
 
     //right bound
     let right = if dir - fov/2 <= 90 || dir - fov/2 > 270 {
         //above line
-        !point_above_line(pos_self, right_slope, point)
+        point_above_line(pos_self, right_slope, point)
     } else {
         //below line
-        point_above_line(pos_self, right_slope, point)
+        !point_above_line(pos_self, right_slope, point)
     };
 
     //distance

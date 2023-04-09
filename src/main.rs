@@ -15,46 +15,43 @@ use crate::conc::{Msg, BeastUpdate};
 use rand::Rng;
 //use plotters::prelude::*;
 //use plotters::coord::types::RangedCoordf32;
+use nanoid::nanoid;
 
 const FPS: i32 = 10;
 const DELAY: i32 = 1000/FPS;
 const MAPSIZE: i32 = 100;
 const FOV: i32 = 90;
+const N_HERB: i32 = 3;
 
 //static world_arc;
 
 fn main(){
 
-    // init world:
+    // init
     let mut rng = rand::thread_rng();
+    let mut ctx = egui::Context::default();
 
-    // ID -> State
+    // world: ID -> State
     let mut world: HashMap<String, (String, (f64, f64), i32, f64, Sender<BeastUpdate>)> = HashMap::new();
-    // pos -> state
+    // world: pos -> state
     let mut world_reverse: Vec<((f64, f64), String, String, i32, f64, Sender<BeastUpdate>)>  = Vec::new();
-    //let mut world_rev_temp: Vec<((f64, f64), String, String, i32, f64)>  = Vec::new();
-
-    //let world_reverse = Arc::new(world_reverse);
-
-    //let world_arc = ArcSwap::from(Arc::new(world_reverse.clone()));
-
-    //let world_mutex = Arc::new(Mutex::new(world));
-    
+  
     //start server
     thread::spawn(|| {server::main()});
 
-    //todo world with 2x capacity
+    // todo world with 2x capacity
 
+    // mailbox
     let (tx, rx) = mpsc::channel::<Msg>();
 
-    let names = vec!["1", "2", "3"];
-    for name in names {
-
+    // spawn Herbivores
+    for _ in 0..=N_HERB {
+        let id = nanoid!();
         let pos: (f64, f64) = (rng.gen_range(0.0..MAPSIZE as f64), 
                                 rng.gen_range(0.0..MAPSIZE as f64));
 
         let h = Herbivore::new(
-            name.to_owned(),
+            id,
             pos, 
             FOV,
             2.0, 
@@ -63,7 +60,6 @@ fn main(){
         );
         thread::spawn(move || {herbivore::main(h, DELAY)});
     } 
-
 
     loop{
         // receive beast states
@@ -82,18 +78,8 @@ fn main(){
             let handle = entry.4.clone();
             world_reverse.push((entry.1, id, beast, entry.2, entry.3, handle));
         }
-        //world_reverse = world_rev_temp.clone();
-
-        //world_arc.store(Arc::new(world_reverse.clone()));
-
-
-
-        /*for e in world_arc.load().iter() {
-            //println!{"Entry: {:?}", e};
-        }*/
 
         // share world
-
         for k in world.keys() {
             let entry = world.get(k).unwrap();
             let handle = (entry.4).clone();
@@ -122,7 +108,6 @@ fn import_beast(b: &impl Beast) {
 fn plot(world: &HashMap<String, (String, (f64, f64), i32, f64, Sender<BeastUpdate>)>) {
     for key in world.keys() {
         let entry = world.get(key).unwrap();
-
 
     }
 }
