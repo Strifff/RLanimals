@@ -3,7 +3,6 @@ use crate::beast_traits::Beast;
 
 use std::{/*cmp::Ordering,*/ thread, time::Duration, convert::TryInto};
 
-use crate::import_beast;
 use crate::conc::{Msg, BeastUpdate};
 use crate::mpsc::{Sender/*,Receiver*/};
 use std::sync::{/*Arc, Mutex,*/ mpsc};
@@ -143,9 +142,6 @@ impl Beast for Herbivore {
 
 pub fn main(mut h: Herbivore, delay: i32) {
 
-    //h.set_speed3();
-    import_beast(&h);
-
     let (tx, rx) = mpsc::channel::<BeastUpdate>();
     let receiver = tx.clone();
 
@@ -173,6 +169,12 @@ pub fn main(mut h: Herbivore, delay: i32) {
         world.retain(|(pos,id,_,_,_,_)| 
             in_view(&h, *pos)
             && *id != h.get_id());
+
+        //todo discrete values for entries
+        //todo position(angle, distance)
+        //todo type
+        //todo speed
+        //todo dir
 
         /*for entry in &world {
             println!("in view: {:?}, from pov: {:?}", entry, h.get_id())

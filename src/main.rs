@@ -8,14 +8,11 @@ mod conc;
 use std::sync::{/*Arc, Mutex,*/mpsc};
 use crate::mpsc::{Sender/*,Receiver*/};
 
-use egui::Context;
 use herbivore::Herbivore;
 use crate::beast_traits::Beast;
 use crate::conc::{Msg, BeastUpdate};
-//use arc_swap::ArcSwap;
 use rand::Rng;
-//use plotters::prelude::*;
-//use plotters::coord::types::RangedCoordf32;
+
 use nanoid::nanoid;
 
 const FPS: i32 = 10;
@@ -24,14 +21,11 @@ const MAPSIZE: i32 = 100;
 const FOV: i32 = 90;
 const N_HERB: i32 = 3;
 
-//static world_arc;
-
 fn main(){
 
     // init
     let mut rng = rand::thread_rng();
-    let mut ctx = egui::Context::default();
-
+    
     // world: ID -> State
     let mut world: HashMap<String, (String, (f64, f64), i32, f64, Sender<BeastUpdate>)> = HashMap::new();
     // world: pos -> state
@@ -45,7 +39,7 @@ fn main(){
     // mailbox
     let (tx, rx) = mpsc::channel::<Msg>();
 
-    // spawn Herbivores
+    // spawn Herbivores //todo make fucntion
     for _ in 0..=N_HERB {
         let id = nanoid!();
         let pos: (f64, f64) = (rng.gen_range(0.0..MAPSIZE as f64), 
@@ -60,12 +54,11 @@ fn main(){
             tx.clone(),
         );
         thread::spawn(move || {herbivore::main(h, DELAY)});
-    } 
+    }
 
     loop{
         // receive beast states
         let received = &rx;
- 
         for msg in received.try_iter() {
             if msg.alive {
                 world.insert(msg.id, (msg.beast, msg.pos, msg.dir, msg.speed, msg.handle));
@@ -96,8 +89,7 @@ fn main(){
         }
 
         // plot
-        plot(&world, &ctx);
-
+        plotter(&world);
 
         // delay
         thread::sleep(Duration::from_millis(DELAY.try_into().unwrap()));
@@ -105,17 +97,8 @@ fn main(){
     }
 }
 
-fn import_beast(b: &impl Beast) {
-    //println!("test");
-    println!("id: {:?}, pos: {:?}", b.get_id(), b.get_pos());
-}
-
-fn plot(world: &HashMap<String, (String, (f64, f64), i32, f64, Sender<BeastUpdate>)>, ctx: &Context) {
-    println!("world");
-    for key in world.keys() {
-        let entry = world.get(key).unwrap();
-        println!("entry: {:?}", entry);
-    }
-
+fn plotter(_: &HashMap<String, (String, (f64, f64), i32, f64, Sender<BeastUpdate>)>) {
+    
+    println!("plot test");
 }
 
