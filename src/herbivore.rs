@@ -170,16 +170,21 @@ pub fn main(mut h: Herbivore, delay: i32) {
             in_view(&h, *pos)
             && *id != h.get_id());
 
+        //todo add border
+
         //todo discrete values for entries
         //todo position(angle, distance)
         //todo type
         //todo speed
         //todo dir
 
-        /*for entry in &world {
+        /*
+        println!("self = {:?}", h.get_id());
+        for entry in &world {
             println!("in view: {:?}, from pov: {:?}", entry, h.get_id())
 
-        }*/
+        }
+        */
 
         h.left();
 

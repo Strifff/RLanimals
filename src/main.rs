@@ -1,4 +1,4 @@
-use std::{thread, time::Duration, collections::HashMap};
+use std::{thread, time::Duration, collections::HashMap, process::Command};
 
 mod server;
 mod beast_traits;
@@ -8,6 +8,9 @@ mod conc;
 use std::sync::{/*Arc, Mutex,*/mpsc};
 use crate::mpsc::{Sender/*,Receiver*/};
 
+use conc::{Main_Server};
+use eframe::egui::Margin;
+use server::Server;
 use herbivore::Herbivore;
 use crate::beast_traits::Beast;
 use crate::conc::{Msg, BeastUpdate};
@@ -15,7 +18,7 @@ use rand::Rng;
 
 use nanoid::nanoid;
 
-const FPS: i32 = 10;
+const FPS: i32 = 60;
 const DELAY: i32 = 1000/FPS;
 const MAPSIZE: i32 = 100;
 const FOV: i32 = 90;
@@ -32,7 +35,15 @@ fn main(){
     let mut world_reverse: Vec<((f64, f64), String, String, i32, f64, Sender<BeastUpdate>)>  = Vec::new();
   
     //start server
-    thread::spawn(|| {server::main()});
+    let (server_tx, server_rx) = mpsc::channel::<Main_Server>();
+    let server = Server::new(MAPSIZE, server_tx.clone());
+    thread::spawn(move || {server::main(server)});
+    let mut server_handle = server_tx.clone();
+    let server_recv = &server_rx;
+    for msg in server_recv.recv() {
+        server_handle = msg.handle_send.clone();
+        println!("Msg value: {:?}", msg.msg_data);
+    }
 
     // todo world with 2x capacity
 
@@ -67,6 +78,13 @@ fn main(){
             }
         }
 
+        // reciver updates from server
+        let received = &server_rx;
+        for msg in received.try_iter() {
+            println!("main received from server");
+        }
+
+
         // update world
         world_reverse.clear();
         for k in world.keys() {
@@ -77,7 +95,7 @@ fn main(){
             world_reverse.push((entry.1, id, beast, entry.2, entry.3, handle));
         }
 
-        // share world
+        // share world with beasts
         for k in world.keys() {
             let entry = world.get(k).unwrap();
             let handle = (entry.4).clone();
@@ -88,17 +106,18 @@ fn main(){
             let _ = handle.send(msg).unwrap();
         }
 
-        // plot
-        plotter(&world);
+        // update server
+        let msg = Main_Server{
+            msg_type: "test test".to_owned(),
+            msg_data: 1, //random data for now
+            handle_send: server_tx.clone(),
+            world: world_reverse.clone(),
+        };
+
+        let _ = server_handle.send(msg);
 
         // delay
         thread::sleep(Duration::from_millis(DELAY.try_into().unwrap()));
 
     }
 }
-
-fn plotter(_: &HashMap<String, (String, (f64, f64), i32, f64, Sender<BeastUpdate>)>) {
-    
-    println!("plot test");
-}
-
