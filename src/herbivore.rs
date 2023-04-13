@@ -40,7 +40,7 @@ impl Herbivore {
             dir: 0, //todo rng
             speed_base: speed,
             speed_curr: speed,
-            energy: 100.0,
+            energy: 1000000000.0,
             fov: fov,
             mapsize: mapsize,
             receiver: receiver,
@@ -215,7 +215,7 @@ pub fn main(mut h: Herbivore, delay: i32) {
     }
 
     //after death
-    println!("{:?} died", h.get_id()); //todo cause of death 
+    //println!("{:?} died", h.get_id()); //todo cause of death 
     let msg = Msg{
         id:     h.get_id(),
         alive:  false,

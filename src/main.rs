@@ -17,11 +17,11 @@ use rand::Rng;
 
 use nanoid::nanoid;
 
-const FPS: i32 = 10;
+const FPS: i32 = 1;
 const DELAY: i32 = 1000/FPS;
 const MAPSIZE: i32 = 100;
 const FOV: i32 = 90;
-const N_HERB: i32 = 3;
+const N_HERB: i32 = 2;
 
 fn main(){
 
@@ -41,7 +41,7 @@ fn main(){
     let server_recv = &server_rx;
     if let Ok(msg) = server_recv.recv() {
         server_handle = msg.handle_send.clone();
-        println!("Msg value: {:?}", msg.msg_data);
+        //println!("Msg value: {:?}", msg.msg_data);
     }
 
     // todo world with 2x capacity
@@ -50,8 +50,9 @@ fn main(){
     let (tx, rx) = mpsc::channel::<Msg>();
 
     // spawn Herbivores //todo make fucntion
-    for _ in 0..=N_HERB {
+    for _ in 1..=N_HERB {
         let id = nanoid!();
+        println!("Spawned: {:?}", id);
         let pos: (f64, f64) = (rng.gen_range(0.0..MAPSIZE as f64), 
                                 rng.gen_range(0.0..MAPSIZE as f64));
 
@@ -107,7 +108,7 @@ fn main(){
                     //everything is fine
                 }
                 Err(_) => { //thread proably dead
-                    println!("send error-------------------------------------------------");
+                    //println!("send error-------------------------------------------------");
                 }
             }
         }
