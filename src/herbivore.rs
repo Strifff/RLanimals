@@ -165,6 +165,10 @@ pub fn main(mut h: Herbivore, delay: i32) {
             //todo only work on last msg
         }
 
+        /*for entry in &world {
+            println!("Entry: {:?}", entry)
+        }*/
+
         //take action
         world.retain(|(pos,id,_,_,_,_)| 
             in_view(&h, *pos)
@@ -266,7 +270,7 @@ fn in_view(b: &impl Beast, point: (f64, f64)) -> bool {
         false
     };
 
-    left && right //&& distance
+    left && right && distance
 }
 
 fn point_above_line((x,y): (f64, f64), slope: f64, point: (f64, f64)) -> bool {

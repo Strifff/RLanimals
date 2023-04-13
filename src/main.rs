@@ -1,4 +1,4 @@
-use std::{thread, time::Duration, collections::HashMap, process::Command};
+use std::{thread, time::Duration, collections::HashMap};
 
 mod server;
 mod beast_traits;
@@ -8,17 +8,16 @@ mod conc;
 use std::sync::{/*Arc, Mutex,*/mpsc};
 use crate::mpsc::{Sender/*,Receiver*/};
 
-use conc::{Main_Server};
-use eframe::egui::Margin;
+use conc::{MainServer};
 use server::Server;
 use herbivore::Herbivore;
-use crate::beast_traits::Beast;
+//use crate::beast_traits::Beast;
 use crate::conc::{Msg, BeastUpdate};
 use rand::Rng;
 
 use nanoid::nanoid;
 
-const FPS: i32 = 60;
+const FPS: i32 = 10;
 const DELAY: i32 = 1000/FPS;
 const MAPSIZE: i32 = 100;
 const FOV: i32 = 90;
@@ -35,12 +34,12 @@ fn main(){
     let mut world_reverse: Vec<((f64, f64), String, String, i32, f64, Sender<BeastUpdate>)>  = Vec::new();
   
     //start server
-    let (server_tx, server_rx) = mpsc::channel::<Main_Server>();
+    let (server_tx, server_rx) = mpsc::channel::<MainServer>();
     let server = Server::new(MAPSIZE, server_tx.clone());
     thread::spawn(move || {server::main(server)});
     let mut server_handle = server_tx.clone();
     let server_recv = &server_rx;
-    for msg in server_recv.recv() {
+    if let Ok(msg) = server_recv.recv() {
         server_handle = msg.handle_send.clone();
         println!("Msg value: {:?}", msg.msg_data);
     }
@@ -60,7 +59,7 @@ fn main(){
             id,
             pos, 
             FOV,
-            2.0, 
+            rng.gen_range(1.0..3.0), 
             MAPSIZE,
             tx.clone(),
         );
@@ -103,15 +102,24 @@ fn main(){
                 kill: false,
                 world: world_reverse.clone()
             };
-            let _ = handle.send(msg).unwrap();
+            match handle.send(msg) {
+                Ok(_) => {
+                    //everything is fine
+                }
+                Err(_) => { //thread proably dead
+                    println!("send error-------------------------------------------------");
+                }
+            }
         }
 
         // update server
-        let msg = Main_Server{
+        let entries = (world_reverse.len()) as i32;
+        let msg = MainServer{
             msg_type: "test test".to_owned(),
             msg_data: 1, //random data for now
             handle_send: server_tx.clone(),
             world: world_reverse.clone(),
+            entries: entries,
         };
 
         let _ = server_handle.send(msg);
