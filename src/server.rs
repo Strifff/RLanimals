@@ -1,7 +1,7 @@
 use rand::Rng;
-use serde_json::{json, Map, Result, Value};
+use serde_json::{json, Map, Result, Value, to_writer};
 use std::fs::File;
-use std::io::{prelude::*, BufWriter};
+use std::io::{prelude::*, BufWriter, BufReader};
 use std::net::{TcpListener, TcpStream};
 use std::process;
 use std::sync::mpsc;
@@ -46,27 +46,22 @@ pub fn main(server: Server) {
     let _ = server.main_handle.send(msg);
 
     thread::spawn(|| server_loop(server));
-
-    //let listener = TcpListener::bind("127.0.0.1:7878").unwrap();
-    //needed to break listener loop
-    //listener.set_nonblocking(true).expect("Cannot set non-blocking");
-
-    let mut world_json = Map::new();
-    //let mut stream = TcpStream::connect("127.0.0.1:7878").unwrap();
-
+    
+    let mut world = {
+        let input = std::fs::read_to_string("src/webpages/world_copy.json").unwrap();
+        serde_json::from_str::<Value>(&input).unwrap()
+    };
+    let world_blanc = world.clone();
+    
     // loop
     loop {
         let received = &server_rx;
         for msg in received.try_iter() {
-            if msg.entries > 0 {
-                //println!("cleared");
-                let _ = &world_json.clear();
-            } else {
-                //println!("exit");
-                //process::exit(1);
-            }
+
+            //world = world_blanc.clone();
 
             //println!("SERVER RECEIVED: {:?} messages", msg.entries);
+            let mut entry_vec: Vec<Value> = Vec::new();
             for entry in msg.world {
                 let entry_json = json!({
                     "beast":  entry.2,
@@ -75,46 +70,31 @@ pub fn main(server: Server) {
                     "dir":    entry.3,
                     "speed":  entry.4,
                 });
-                //println!("id: {:?}, state: {:?}", &entry.1, &entry_json);
-                world_json.insert(entry.1, entry_json);
+                entry_vec.push(entry_json);
+
             }
+            world["entries"] = Value::Array(entry_vec);
+           
         }
-        // write to file
-        /*let file = File::create("src/webpages/world.json");
-        let mut writer = BufWriter::new(file.unwrap());
-        let _ = serde_json::to_writer(&mut writer, &world_json);
-        writer.flush();*/
+
+        std::fs::write(
+            "src/webpages/world.json",
+            serde_json::to_string_pretty(&world).unwrap(),
+        ).unwrap();
 
         // send to website //todo handle error
-        //let mut stream = TcpStream::connect("127.0.0.1:7878").unwrap();
-
+        let mut stream = TcpStream::connect("127.0.0.1:7878").unwrap();
         let status_line = "update world".to_owned();
+        let response = format!("{} \r\n\r\n", status_line);
 
-        let response = format!("{} \r\n\r\n", status_line,);
-
-        //stream.write(response.as_bytes()).unwrap();
-        //stream.flush().unwrap();
-
-        //poll_mailbox
-        /*for stream in listener.incoming() {
-            match stream {
-                Ok(s) => {
-                    // do something with the TcpStream
-                    handle_connection(s);
-
-                }
-                Err(ref e) /*if e.kind() == io::ErrorKind::WouldBlock*/ => {
-                    // Decide if we should exit
-                    break;
-                    // Decide if we should try to accept a connection again
-                    //continue;
-                }
-                Err(_) => {
-                    panic!("encountered IO error");
-                }
-               // _ => panic!("encountered IO error: {}", e),
+        match stream.write(response.as_bytes()) {
+            Ok(o) => {}
+            Err(e) => {
+                println!("Error send update: {:?}", e);
+                continue;
             }
-        }*/
+        };
+        stream.flush().unwrap();
     }
 }
 
@@ -128,7 +108,7 @@ fn server_loop(server: Server) {
 }
 
 fn handle_connection(mut stream: TcpStream) {
-    println!("handeling connection");
+    //println!("handeling connection");
     let mut buffer = [0; 1024];
 
     match stream.read(&mut buffer) {
@@ -152,7 +132,6 @@ fn handle_connection(mut stream: TcpStream) {
     } else if buffer.starts_with(graph) {
         ("HTTP/1.1 200 OK", "index.html", "text/html")
     } else if buffer.starts_with(update) {
-        //println!("test test");
         ("HTTP/1.1 200 OK", "index.html", "text/html")
     } else {
         ("HTTP/1.1 404 NOT FOUND", "404.html", "text/html")
@@ -160,26 +139,33 @@ fn handle_connection(mut stream: TcpStream) {
 
     let path = format!("src/webpages/{}", filename);
     let contents = fs::read_to_string(path).unwrap();
-    println!("{:?}", contents);
 
-    let response: String = if content_type == "application/json".to_owned() {
-        format!(
-            "{} \r\nContent-Length: {}\r\nContent-Type: {}\r\n\r\n{}",
-            status_line,
-            contents.len(),
-            content_type.to_owned(),
-            contents
-        )
+    if content_type.to_owned() == "application/json" {
+        let path = format!("src/webpages/{}", filename);
+        let file = File::open(path).unwrap();
+        let reader = BufReader::new(file);
+    
+        let contents = match serde_json::from_reader(reader) {
+            Ok(o) => {o}
+            Err(e) => {
+                println!("Error read JSON: {:?}", e);
+                {}
+            }
+        };
+        let _ = serde_json::to_writer(stream, &contents);
     } else {
+        let path = format!("src/webpages/{}", filename);
+        let contents = fs::read_to_string(path).unwrap();
+        let response: String =
         format!(
             "{} \r\nContent-Length: {}\r\nContent-Type: {}\r\n\r\n{}",
             status_line,
             contents.len(),
             content_type.to_owned(),
             contents
-        )
-    };
+        );
+        stream.write(response.as_bytes()).unwrap();
+        stream.flush();
+    }
 
-    stream.write(response.as_bytes()).unwrap();
-    stream.flush().unwrap();
 }

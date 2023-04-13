@@ -8,20 +8,8 @@ const yArray = [7,8,8,9,9,9,10,11,14,14,15];
 
 ctx.fillStyle = "red";
 
-setInterval(() => {
-    fetch("/calc-new-state").then((res) => {
-        console.log(res);
-        const xArray = res["body"]["xArray"];
-        const yArray = res["body"]["yArray"];
-
-        for (let i = 0; i < xArray.length-1; i++) {
-            let x = xArray[i]*400/150;
-            let y = yArray[i]*400/15;
-            ctx.beginPath();
-            ctx.ellipse(x, y, 3, 3, 0, 0, Math.PI * 2);
-            ctx.fill();
-        }
-    }).catch((e) => {
-        console.error(`ERROR OCCURED: ${e}`);
-    });
+setInterval(async () => {
+    const res = await fetch("/calc-new-state")
+    const myJSON = await res.json();
+    console.log(myJSON);
 }, 1000)
