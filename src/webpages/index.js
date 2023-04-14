@@ -19,10 +19,8 @@ setInterval(async () => {
             ctx.beginPath();
             ctx.arc(entry.pos_x, entry.pos_y, 100, sAngle, eAngle);
             ctx.lineTo(entry.pos_x, entry.pos_y);
-            ctx.fillStyle = "rgba(0, 0, 200, 0.3)";
+            ctx.fillStyle = "rgba(115, 216, 250, 0.2)";
             ctx.fill();
-
-
             size = 5;
             ctx.fillStyle = "red";
         

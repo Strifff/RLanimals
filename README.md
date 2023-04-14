@@ -53,3 +53,7 @@ Every beast runs on a thread which is working concurrently. To be able to update
 the world state, message passing is used towards the main theard, ~~and the beasts
 reads the world from an Atomic Reference Counted (ARC) vector.~~ ARC abanonded
 due to difficuly to share across threads, message passing is used both ways now.
+
+### Web based GUI
+
+![Drunk bird movemnet](images/drunk_birds.gif)(Random movement and FOV)
