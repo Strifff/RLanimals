@@ -7,6 +7,7 @@ use crate::conc::{Msg, BeastUpdate};
 use crate::mpsc::{Sender/*,Receiver*/};
 use std::sync::{/*Arc, Mutex,*/ mpsc};
 //use arc_swap::ArcSwap;
+use rand::Rng;
 
 pub struct Herbivore {
     id: String,
@@ -40,7 +41,7 @@ impl Herbivore {
             dir: 0, //todo rng
             speed_base: speed,
             speed_curr: speed,
-            energy: 100.0,
+            energy: 1000.0,
             fov: fov,
             mapsize: mapsize,
             receiver: receiver,
@@ -145,7 +146,9 @@ pub fn main(mut h: Herbivore, delay: i32) {
     let (tx, rx) = mpsc::channel::<BeastUpdate>();
     let receiver = tx.clone();
 
-    let mut world: Vec<((f64, f64), String, String, i32, f64, Sender<BeastUpdate>)> = Vec::new();
+    let mut world: Vec<((f64, f64), String, String, i32, i32, f64, Sender<BeastUpdate>)> = Vec::new();
+
+    let mut rng = rand::thread_rng();
 
     while h.alive {
 
@@ -170,7 +173,7 @@ pub fn main(mut h: Herbivore, delay: i32) {
         }*/
 
         //take action
-        world.retain(|(pos,id,_,_,_,_)| 
+        world.retain(|(pos,id,_,_,_,_,_)| 
             in_view(&h, *pos)
             && *id != h.get_id());
 
@@ -189,8 +192,17 @@ pub fn main(mut h: Herbivore, delay: i32) {
 
         }
         */
-
-        h.left();
+        let index = rng.gen_range(0..6) as i32;
+        match index {
+            0 => {h.set_speed1()}
+            1 => {h.set_speed2()}
+            2 => {h.set_speed3()}
+            3 => {h.forward()}
+            4 => {h.left()}
+            5 => {h.right()}
+            6 => {h.back()}
+            _ => {}
+        }
 
         //update main
         let msg = Msg{
@@ -199,6 +211,7 @@ pub fn main(mut h: Herbivore, delay: i32) {
             beast:  "Herbivore".to_owned(),
             pos:    h.get_pos(),
             dir:    h.get_dir(),
+            fov:    h.get_fov(),
             speed:  h.get_speed(),
             handle: receiver.clone(),
         };
@@ -215,13 +228,14 @@ pub fn main(mut h: Herbivore, delay: i32) {
     }
 
     //after death
-    //println!("{:?} died", h.get_id()); //todo cause of death 
+    println!("{:?} died", h.get_id()); //todo cause of death 
     let msg = Msg{
         id:     h.get_id(),
         alive:  false,
         beast:  "Herbivore".to_owned(),
         pos:    h.get_pos(),
         dir:    h.get_dir(),
+        fov:    h.get_fov(),
         speed:  h.get_speed(),
         handle: receiver.clone(),
     };

@@ -17,11 +17,11 @@ use rand::Rng;
 
 use nanoid::nanoid;
 
-const FPS: i32 = 1;
+const FPS: i32 = 10;
 const DELAY: i32 = 1000/FPS;
-const MAPSIZE: i32 = 100;
+const MAPSIZE: i32 = 500;
 const FOV: i32 = 90;
-const N_HERB: i32 = 10;
+const N_HERB: i32 = 100;
 
 fn main(){
 
@@ -29,9 +29,9 @@ fn main(){
     let mut rng = rand::thread_rng();
     
     // world: ID -> State
-    let mut world: HashMap<String, (String, (f64, f64), i32, f64, Sender<BeastUpdate>)> = HashMap::new();
+    let mut world: HashMap<String, (String, (f64, f64), i32, i32, f64, Sender<BeastUpdate>)> = HashMap::new();
     // world: pos -> state
-    let mut world_reverse: Vec<((f64, f64), String, String, i32, f64, Sender<BeastUpdate>)>  = Vec::new();
+    let mut world_reverse: Vec<((f64, f64), String, String, i32, i32, f64, Sender<BeastUpdate>)>  = Vec::new();
   
     //start server
     let (server_tx, server_rx) = mpsc::channel::<MainServer>();
@@ -72,7 +72,7 @@ fn main(){
         let received = &rx;
         for msg in received.try_iter() {
             if msg.alive {
-                world.insert(msg.id, (msg.beast, msg.pos, msg.dir, msg.speed, msg.handle));
+                world.insert(msg.id, (msg.beast, msg.pos, msg.dir, msg.fov, msg.speed, msg.handle));
             } else {
                 let _ = world.remove(&msg.id);
             }
@@ -91,14 +91,14 @@ fn main(){
             let entry = world.get(k).unwrap();
             let id = k.clone();
             let beast = entry.0.clone();
-            let handle = entry.4.clone();
-            world_reverse.push((entry.1, id, beast, entry.2, entry.3, handle));
+            let handle = entry.5.clone();
+            world_reverse.push((entry.1, id, beast, entry.2, entry.3, entry.4, handle));
         }
 
         // share world with beasts
         for k in world.keys() {
             let entry = world.get(k).unwrap();
-            let handle = (entry.4).clone();
+            let handle = (entry.5).clone();
             let msg = BeastUpdate {
                 kill: false,
                 world: world_reverse.clone()

@@ -33,7 +33,7 @@ impl Server {
 pub fn main(server: Server, delay: i32) {
     // init main with server
     let (server_tx, server_rx) = mpsc::channel::<MainServer>();
-    let world_empty: Vec<((f64, f64), String, String, i32, f64, Sender<BeastUpdate>)> = Vec::new();
+    let world_empty: Vec<((f64, f64), String, String, i32, i32,f64, Sender<BeastUpdate>)> = Vec::new();
     let msg = MainServer {
         msg_type: "main update".to_owned(),
         msg_data: 2,
@@ -69,7 +69,8 @@ pub fn main(server: Server, delay: i32) {
                     "pos_x":  entry.0.0,
                     "pos_y":  entry.0.1,
                     "dir":    entry.3,
-                    "speed":  entry.4,
+                    "fov":    entry.4,
+                    "speed":  entry.5,
                 });
                 entry_vec.push(entry_json);
 
@@ -143,28 +144,22 @@ fn handle_connection(mut stream: TcpStream) {
         ("HTTP/1.1 404 NOT FOUND", "404.html", "text/html")
     };
 
-    let path = format!("src/webpages/{}", filename);
-    let contents = fs::read_to_string(path).unwrap();
-
     if content_type.to_owned() == "application/json" {
         let path = format!("src/webpages/{}", filename);
-        let file = File::open(path).unwrap();
-        let reader = BufReader::new(file);
-    
-        /*let contents = match serde_json::from_reader(reader) {
-            Ok(o) => {o}
-            Err(e) => {
-                println!("Error read JSON: {:?}", e);
-                {}
-            }
-        };*/
         let contents = {
-            let input = std::fs::read_to_string("src/webpages/world.json").unwrap();
-            serde_json::from_str::<Value>(&input).unwrap()
+            let input = std::fs::read_to_string(path).unwrap();
+            //serde_json::from_str::<Value>(&input).unwrap()
+            match serde_json::from_str::<Value>(&input) {
+                Ok(o) => {o}
+                Err(e) => {
+                    let input = std::fs::read_to_string("src/webpages/world_copy.json").unwrap();
+                    serde_json::from_str::<Value>(&input).unwrap() 
+                }
+            }
         };
 
-
         let _ = serde_json::to_writer(stream, &contents);
+
     } else {
         let path = format!("src/webpages/{}", filename);
         let contents = fs::read_to_string(path).unwrap();
