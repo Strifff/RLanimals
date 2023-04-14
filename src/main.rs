@@ -21,7 +21,7 @@ const FPS: i32 = 10;
 const DELAY: i32 = 1000/FPS;
 const MAPSIZE: i32 = 500;
 const FOV: i32 = 90;
-const N_HERB: i32 = 100;
+const N_HERB: i32 = 20;
 
 fn main(){
 

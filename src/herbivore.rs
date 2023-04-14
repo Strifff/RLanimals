@@ -9,6 +9,7 @@ use std::sync::{/*Arc, Mutex,*/ mpsc};
 //use arc_swap::ArcSwap;
 use rand::Rng;
 
+
 pub struct Herbivore {
     id: String,
     alive: bool,
@@ -38,7 +39,11 @@ impl Herbivore {
             id: id,
             alive: true,
             pos: pos, 
-            dir: 0, //todo rng
+            dir: {
+                let mut rng = rand::thread_rng();
+                //random direction with increments of 15
+                15*rng.gen_range(0..24)
+            },
             speed_base: speed,
             speed_curr: speed,
             energy: 1000.0,
