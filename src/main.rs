@@ -36,7 +36,7 @@ fn main(){
     //start server
     let (server_tx, server_rx) = mpsc::channel::<MainServer>();
     let server = Server::new(MAPSIZE, server_tx.clone());
-    thread::spawn(move || {server::main(server)});
+    thread::spawn(move || {server::main(server, DELAY)});
     let mut server_handle = server_tx.clone();
     let server_recv = &server_rx;
     if let Ok(msg) = server_recv.recv() {

@@ -7,7 +7,7 @@ eats herbivores.
 ## Goals
 
 - [ ] Reinforcement learning for beasts
-- [ ] Concurrent threads for each beast
+- [x] Concurrent threads for each beast
 - [ ] A simple web-based GUI
 
 ## The journey

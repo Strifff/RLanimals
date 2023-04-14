@@ -40,7 +40,7 @@ impl Herbivore {
             dir: 0, //todo rng
             speed_base: speed,
             speed_curr: speed,
-            energy: 1000000000.0,
+            energy: 100.0,
             fov: fov,
             mapsize: mapsize,
             receiver: receiver,
