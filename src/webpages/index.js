@@ -17,7 +17,7 @@ setInterval(async () => {
             sAngle = (entry.dir - entry.fov/2)*Math.PI/180.0;
             eAngle = (entry.dir + entry.fov/2)*Math.PI/180.0;
             ctx.beginPath();
-            ctx.arc(entry.pos_x, entry.pos_y, 100, sAngle, eAngle);
+            ctx.arc(entry.pos_x, entry.pos_y, entry.sight_range, sAngle, eAngle);
             ctx.lineTo(entry.pos_x, entry.pos_y);
             ctx.fillStyle = "rgba(115, 216, 250, 0.2)";
             ctx.fill();
@@ -30,4 +30,4 @@ setInterval(async () => {
         ctx.fill();
     }
 
-}, 100)
+}, 30)

@@ -20,6 +20,7 @@ pub trait Beast{
     fn in_bounds(&self, x: f64, y: f64)     -> (f64,f64);
 
     fn get_fov(&self)                       -> i32; 
+    fn get_ros(&self)                       -> i32;
 
     fn consume_energy(&mut self);
     fn starve(&mut self);

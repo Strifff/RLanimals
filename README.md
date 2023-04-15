@@ -56,4 +56,8 @@ due to difficuly to share across threads, message passing is used both ways now.
 
 ### Web based GUI
 
-![Drunk bird movemnet](images/drunk_birds.gif)(Random movement and FOV)
+![Drunk bird movemnet](images/drunk_birds.gif)
+
+![Fov](images/Apr-15-2023%2011-51-13.gif)
+
+

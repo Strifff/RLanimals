@@ -33,7 +33,7 @@ impl Server {
 pub fn main(server: Server, delay: i32) {
     // init main with server
     let (server_tx, server_rx) = mpsc::channel::<MainServer>();
-    let world_empty: Vec<((f64, f64), String, String, i32, i32,f64, Sender<BeastUpdate>)> = Vec::new();
+    let world_empty: Vec<((f64, f64), String, String, i32, i32, i32, f64, Sender<BeastUpdate>)> = Vec::new();
     let msg = MainServer {
         msg_type: "main update".to_owned(),
         msg_data: 2,
@@ -70,13 +70,13 @@ pub fn main(server: Server, delay: i32) {
                     "pos_y":  entry.0.1,
                     "dir":    entry.3,
                     "fov":    entry.4,
-                    "speed":  entry.5,
+                    "sight_range": entry.5,
+                    "speed":  entry.6,
                 });
                 entry_vec.push(entry_json);
 
             }
             world["entries"] = Value::Array(entry_vec);
-            println!("wrote world");
            
         }
 
@@ -148,7 +148,6 @@ fn handle_connection(mut stream: TcpStream) {
         let path = format!("src/webpages/{}", filename);
         let contents = {
             let input = std::fs::read_to_string(path).unwrap();
-            //serde_json::from_str::<Value>(&input).unwrap()
             match serde_json::from_str::<Value>(&input) {
                 Ok(o) => {o}
                 Err(e) => {
