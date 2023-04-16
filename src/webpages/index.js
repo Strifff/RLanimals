@@ -1,15 +1,16 @@
-const canvas = document.getElementById("myCanvas");
+const canvas = document.getElementById("map");
 const ctx = canvas.getContext("2d");
+
 canvas.height = canvas.width;
 ctx.transform(1, 0, 0, -1, 0, canvas.height)
 
 ctx.fillStyle = "red";
 
 setInterval(async () => {
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
     const res = await fetch("/calc-new-state")
     const world = await res.json();
     const entries = world["entries"];
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
     for (i = 0; i < entries.length; i++) {
         entry = entries[i]
         if (entry.beast == "Herbivore") {
@@ -23,11 +24,14 @@ setInterval(async () => {
             ctx.fill();
             size = 5;
             ctx.fillStyle = "red";
-        
         }
+        if (entry.beast == "Plant") {
+            size = 3;
+            ctx.fillStyle = "green";
+        }
+        //body
         ctx.beginPath();
         ctx.arc(entry.pos_x, entry.pos_y, size, 0, 2 * Math.PI);
         ctx.fill();
     }
-
-}, 30)
+}, 16)

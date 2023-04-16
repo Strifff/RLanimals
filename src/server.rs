@@ -1,12 +1,9 @@
-use rand::Rng;
-use serde_json::{json, Map, Result, Value, to_writer};
-use std::fs::File;
-use std::io::{prelude::*, BufWriter, BufReader};
+use serde_json::{json, Value};
+use std::io::{prelude::*};
 use std::net::{TcpListener, TcpStream};
-use std::process;
 use std::sync::mpsc;
 use std::time::Duration;
-use std::{fs, process::Command, thread};
+use std::{fs, thread};
 
 //use std::time::Duration;
 
@@ -38,11 +35,9 @@ pub fn main(server: Server, delay: i32) {
         msg_type: "main update".to_owned(),
         msg_data: 2,
         handle_send: server_tx.clone(),
-        world: world_empty,
+        world: None,
         entries: 0,
     };
-
-    let mut rng = rand::thread_rng();
 
     let _ = server.main_handle.send(msg);
 
@@ -52,7 +47,7 @@ pub fn main(server: Server, delay: i32) {
         let input = std::fs::read_to_string("src/webpages/world_copy.json").unwrap();
         serde_json::from_str::<Value>(&input).unwrap()
     };
-    let world_blanc = world.clone();
+    //let world_blanc = world.clone();
 
     // loop
     loop {
@@ -63,7 +58,7 @@ pub fn main(server: Server, delay: i32) {
 
             //println!("SERVER RECEIVED: {:?} messages", msg.entries);
             let mut entry_vec: Vec<Value> = Vec::new();
-            for entry in msg.world {
+            for entry in msg.world.unwrap() {
                 let entry_json = json!({
                     "beast":  entry.2,
                     "pos_x":  entry.0.0,
@@ -76,6 +71,7 @@ pub fn main(server: Server, delay: i32) {
                 entry_vec.push(entry_json);
 
             }
+            //todo add fields for hv, cv and plant
             world["entries"] = Value::Array(entry_vec);
            
         }
@@ -84,21 +80,6 @@ pub fn main(server: Server, delay: i32) {
             "src/webpages/world.json",
             serde_json::to_string_pretty(&world).unwrap(),
         ).unwrap();
-
-        // send to website //todo handle error
-        /*let mut stream = TcpStream::connect("127.0.0.1:7878").unwrap();
-        let status_line = "update world".to_owned();
-        let response = format!("{} \r\n\r\n", status_line);
-
-        match stream.write(response.as_bytes()) {
-            Ok(o) => {}
-            Err(e) => {
-                println!("Error send update: {:?}", e);
-                continue;
-            }
-        };
-        stream.flush().unwrap();*/
-
 
         //delay
         thread::sleep(Duration::from_millis(delay.try_into().unwrap()));
@@ -146,15 +127,16 @@ fn handle_connection(mut stream: TcpStream) {
 
     if content_type.to_owned() == "application/json" {
         let path = format!("src/webpages/{}", filename);
-        let contents = {
-            let input = std::fs::read_to_string(path).unwrap();
+        let contents = { read_json_loop(path, 1)
+            /*let input = std::fs::read_to_string(path).unwrap();
             match serde_json::from_str::<Value>(&input) {
                 Ok(o) => {o}
                 Err(e) => {
+                    println!("Error readin json: {:?}", e); 
                     let input = std::fs::read_to_string("src/webpages/world_copy.json").unwrap();
-                    serde_json::from_str::<Value>(&input).unwrap() 
+                    serde_json::from_str::<Value>(&input).unwrap()
                 }
-            }
+            }*/
         };
 
         let _ = serde_json::to_writer(stream, &contents);
@@ -171,7 +153,26 @@ fn handle_connection(mut stream: TcpStream) {
             contents
         );
         stream.write(response.as_bytes()).unwrap();
-        stream.flush();
+        stream.flush().unwrap();
     }
 
+}
+
+
+fn read_json_loop(path: String, iteration: i32) -> Value {
+    let input = std::fs::read_to_string(&path).unwrap();
+    match serde_json::from_str::<Value>(&input) {
+        Ok(o) => {o}
+        Err(e) => {
+            if iteration > 10 {
+                println!("Tried to read json {:?} times, error: {:?}", iteration, e);
+            }
+            if iteration > 30 {
+                println!("Returned empty world");
+                let input_empty = std::fs::read_to_string("src/webpages/world_copy.json").unwrap();
+                return serde_json::from_str::<Value>(&input_empty).unwrap();
+            }
+            read_json_loop(path, iteration+1)
+        }
+    }
 }

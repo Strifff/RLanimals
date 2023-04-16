@@ -12,6 +12,7 @@ pub trait Beast{
     fn set_speed2(&mut self);
     fn set_speed3(&mut self);
     fn get_speed(&self)                     -> f64;
+    fn get_speed_base(&self)                -> f64;
 
     fn forward(&mut self);
     fn left(&mut self);
@@ -25,4 +26,11 @@ pub trait Beast{
     fn consume_energy(&mut self);
     fn starve(&mut self);
     fn kill(&mut self)                      -> bool;
+}
+
+pub enum Actor {
+    Wall,
+    Plant,
+    Herbivore,
+    Carnivore
 }

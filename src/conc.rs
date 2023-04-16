@@ -1,6 +1,3 @@
-//use std::sync::mpsc::Receiver;
-
-//use crate::beast_traits::Beast;
 use crate::mpsc::{Sender/*,Receiver*/};
 
 pub struct Msg {
@@ -16,8 +13,11 @@ pub struct Msg {
 }
 
 pub struct BeastUpdate {
-    pub kill: bool,
-    pub world: Vec<((f64, f64), String, String, i32, i32, i32, f64, Sender<BeastUpdate>)>, 
+    pub try_eat: bool,
+    pub eat_result: bool,
+    pub eat_value: i32,
+    pub response_handle: Option<Sender<BeastUpdate>>,
+    pub world: Option<Vec<((f64, f64), String, String, i32, i32, i32, f64, Sender<BeastUpdate>)>>, 
 }
 
 //todo impl Msg for many msg types
@@ -26,6 +26,6 @@ pub struct MainServer {
     pub msg_type: String,
     pub msg_data: i32,
     pub handle_send: Sender<MainServer>,
-    pub world: Vec<((f64, f64), String, String, i32, i32, i32, f64, Sender<BeastUpdate>)>,
+    pub world: Option<Vec<((f64, f64), String, String, i32, i32, i32, f64, Sender<BeastUpdate>)>>,
     pub entries: i32, 
 }

@@ -1,4 +1,5 @@
 use crate::beast_traits::Beast;
+use std::collections::HashMap;
 use std::process;
 use std::{/*cmp::Ordering,*/ thread, time::Duration, convert::TryInto};
 
@@ -7,6 +8,14 @@ use crate::mpsc::{Sender/*,Receiver*/};
 use std::sync::{/*Arc, Mutex,*/ mpsc};
 //use arc_swap::ArcSwap;
 use rand::Rng;
+use nanoid::nanoid;
+
+const RADIUS: i32 = 150;
+const EAT_RANGE: i32 = 50;
+const CHILD_THRESH: i32 = 50;
+
+use crate::MAPSIZE;
+use crate::DELAY;
 
 
 pub struct Herbivore {
@@ -19,9 +28,9 @@ pub struct Herbivore {
     fov: i32,
     sight_range: i32,
     energy: f64,
-    mapsize: i32,
-    receiver: Sender<Msg>,
-    //world: &'static ArcSwap<Vec<((f64, f64), String, String, i32, f64)>>,
+    eaten: i32,
+    gen: i32,
+    main_handle: Sender<Msg>,
 }
 
 impl Herbivore {
@@ -29,10 +38,9 @@ impl Herbivore {
         id: String, 
         pos: (f64,f64), 
         fov: i32,
-        speed: f64, 
-        mapsize: i32,
-        receiver: Sender<Msg>,
-       // world: &'static ArcSwap<Vec<((f64, f64), String, String, i32, f64)>>,
+        speed: f64,
+        gen: i32, 
+        handle: Sender<Msg>,
     ) -> Herbivore {
 
         Herbivore {
@@ -45,12 +53,13 @@ impl Herbivore {
                 15*rng.gen_range(0..24) },
             speed_base: speed,
             speed_curr: speed,
-            energy: 10000.0,
+            energy: 5000.0,
             fov: fov,
             sight_range: { let sr = 1000.0*(1.0/fov as f64).sqrt();
                             sr as i32},
-            mapsize: mapsize,
-            receiver: receiver,
+            eaten: 0,
+            gen: gen,
+            main_handle: handle,
             //world: world,
         }
     }
@@ -91,6 +100,9 @@ impl Beast for Herbivore {
     fn get_speed(&self) -> f64 {
         self.speed_curr.clone()
     }
+    fn get_speed_base(&self) -> f64 {
+        self.speed_base.clone()
+    }
     fn forward(&mut self) {
         let dir_rad: f64 = self.dir as f64 *3.141593/180.0;
         let x = self.pos.0 + self.speed_curr * dir_rad.cos();
@@ -121,8 +133,8 @@ impl Beast for Herbivore {
     }
     fn in_bounds(&self, x: f64, y: f64) -> (f64,f64) {
         let vec: Vec<f64> = vec![x,y].into_iter().map(|val| 
-            {if val > self.mapsize as f64 {
-                self.mapsize.clone() as f64
+            {if val > MAPSIZE as f64 {
+                MAPSIZE.clone() as f64
             } else if val < 0 as f64 {
                 0 as f64
             } else { 
@@ -159,23 +171,77 @@ pub fn main(mut h: Herbivore, delay: i32) {
     let mut world: Vec<((f64, f64), String, String, i32, i32, i32, f64, Sender<BeastUpdate>)> = Vec::new();
 
     let mut rng = rand::thread_rng();
+                                //(msg.beast, msg.pos, msg.dir, msg.speed, msg.handle)
+    let mut memory: HashMap<String, (String, (f64, f64), i32, f64, Sender<BeastUpdate>)> = HashMap::new();
 
-    while h.alive {
+    let mut signals_nn = [[0;10];24];
+
+    'herb_loop: while h.alive {
         let received = &rx;
  
         world.clear();
         for msg in received.try_iter() {
-            world = msg.world;
-            //todo only work on last msg
+            if msg.try_eat && h.alive {
+                //todo respond to carnivore
+                break 'herb_loop;
+            } else if msg.eat_result {
+                h.eaten += msg.eat_value;
+                h.energy += msg.eat_value as f64 * 10.0;
+                if h.eaten > CHILD_THRESH {
+                    spawn_child(&h, h.gen, h.main_handle.clone());
+                    h.eaten -= CHILD_THRESH;
+                }
+                //println!("Eaten: {:?}", h.eaten);
+            } else {
+                world = msg.world.unwrap();
+            }
         }
 
         //take action
         world.retain(|(other_pos,id,_,_,_,_,_,_)| 
             *id != h.get_id()            // cant see self
             &&                           //     and
-            in_view(h.get_pos(), h.get_dir(), h.get_fov(), h.get_ros(), *other_pos)); // other in field of view
+            in_view(&h,  *other_pos)); // other in field of view
 
-        
+        //todo append from memory
+        //memory as hashmap to overwrite the old position
+        for entry in &world {
+            let id = entry.1.clone();
+            let actor = entry.2.clone();
+            let handle = entry.7.clone();
+                    // VALUE: (msg.actor/beast, msg.pos, msg.dir, msg.speed, msg.handle)
+            memory.insert(id, (actor, entry.0, entry.3, entry.6, handle));
+        }
+
+        // clear mamory from entries further away than RADIUS 
+        //todo clear memory after time, forgetting
+        memory.retain(|key, entry| 
+            point_within_radius(h.pos, entry.1, RADIUS));
+
+        //println!("------ MEMORY ------");
+        for key in memory.keys() {
+            let entry = memory.get(key).unwrap();
+            if point_within_radius(h.pos, entry.1, EAT_RANGE) 
+                && entry.0 == "Plant" {
+                let eat_msg = BeastUpdate {
+                    try_eat: true,
+                    eat_result: false,
+                    eat_value: 0,
+                    response_handle: Some(tx.clone()),
+                    world: None,
+                };
+                match entry.4.send(eat_msg) {
+                    Ok(o) => {}
+                    Err(e) => {}
+                }
+            }
+        }
+        //reset signals
+        signals_nn.iter_mut().for_each(|m|
+             m.iter_mut().for_each(|m| *m = 111));
+
+
+
         //todo add border
 
         //todo discrete values for entries
@@ -183,11 +249,6 @@ pub fn main(mut h: Herbivore, delay: i32) {
         //todo type
         //todo speed
         //todo dir
-
-        //todo append from memory
-        for entry in &world {
-            println!("in view: {:?}, from pov: {:?}", entry, h.get_id());
-        }
         
         let index = rng.gen_range(0..6) as i32;
         match index {
@@ -213,8 +274,8 @@ pub fn main(mut h: Herbivore, delay: i32) {
             speed:  h.get_speed(),
             handle: receiver.clone(),
         };
-        
-        h.receiver.send(msg).unwrap();
+
+        h.main_handle.send(msg).unwrap();
 
         //delay
         thread::sleep(Duration::from_millis(delay.try_into().unwrap()));
@@ -224,7 +285,7 @@ pub fn main(mut h: Herbivore, delay: i32) {
     }
 
     //after death
-    println!("{:?} died", h.get_id()); //todo cause of death 
+    println!("{:?} died, generation: {:?}", h.get_id(), h.gen); //todo cause of death 
     let msg = Msg{
         id:     h.get_id(),
         alive:  false,
@@ -237,12 +298,16 @@ pub fn main(mut h: Herbivore, delay: i32) {
         handle: receiver.clone(),
     };
 
-    h.receiver.send(msg).unwrap();
+    h.main_handle.send(msg).unwrap();
 
 }
 
-fn in_view(pos_self: (f64, f64), dir_self: i32, fov_self: i32, ros_self: i32, other_pos: (f64, f64)) -> bool {
-    
+fn in_view(h: &Herbivore, other_pos: (f64, f64)) -> bool {
+    let pos_self = h.get_pos();  // position
+    let dir_self = h.get_dir();         // view direction
+    let fov_self =h.get_fov();          // field of view
+    let ros_self = h.get_ros();         // range of sight
+
     let left_dir_rad: f64 = ((dir_self+fov_self/2)%180) as f64 *3.141593/180.0;
     let right_dir_rad: f64 = ((dir_self-fov_self/2)%180) as f64 *3.141593/180.0;
     
@@ -286,5 +351,25 @@ fn point_above_line((x,y): (f64, f64), slope: f64, point: (f64, f64)) -> bool {
     let m = y - slope*x;
 
     point.0 * slope + m < point.1
+}
+
+fn point_within_radius(point_self: (f64, f64), point_other: (f64, f64), radius: i32) -> bool {
+    let dx = (point_self.0 - point_other.0).abs();
+    let dy = (point_self.1 - point_other.1).abs();
+    let d = (dx*dx+dy*dy).sqrt();
+
+    d < radius as f64
+}
+
+fn spawn_child(parent: &impl Beast, generation: i32, main_handle: Sender<Msg>) {
+    let child = Herbivore::new(
+        nanoid!(),
+        parent.get_pos(),
+        parent.get_fov(),
+        parent.get_speed_base(),
+        generation + 1,
+        main_handle  
+    );
+    thread::spawn( move || {main(child, DELAY)});
 }
 
