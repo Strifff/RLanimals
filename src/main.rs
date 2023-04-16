@@ -66,7 +66,7 @@ fn main(){
             0, 
             tx.clone(),
         );
-        thread::spawn(move || {herbivore::main(h, DELAY)});
+        thread::spawn(move || {herbivore::main(h)});
     }
 
     loop{
@@ -86,7 +86,6 @@ fn main(){
         for msg in received.try_iter() {
             println!("main received from server");
         }
-
 
         // update world
         world_reverse.clear();
