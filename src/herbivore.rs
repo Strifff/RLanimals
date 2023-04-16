@@ -1,4 +1,4 @@
-use crate::beast_traits::Beast;
+use crate::beast_traits::{Beast, Actor};
 use std::collections::HashMap;
 use std::process;
 use std::{/*cmp::Ordering,*/ thread, time::Duration, convert::TryInto};
@@ -6,13 +6,22 @@ use std::{/*cmp::Ordering,*/ thread, time::Duration, convert::TryInto};
 use crate::conc::{Msg, BeastUpdate};
 use crate::mpsc::{Sender/*,Receiver*/};
 use std::sync::{/*Arc, Mutex,*/ mpsc};
-//use arc_swap::ArcSwap;
 use rand::Rng;
 use nanoid::nanoid;
 
-const RADIUS: i32 = 150;
+                                // forget objects far away
+const MEM_RADIUS: i32 = ((NN_RAY_LEN as f64 + 1.5 )*NN_RAY_DR as f64) as i32;    
 const EAT_RANGE: i32 = 50;
-const CHILD_THRESH: i32 = 50;
+const CHILD_THRESH: i32 = 50;   // food to spawn child
+
+// make environment discrete
+const NN_RAYS: usize = 24;      // directions for the input of a beast, full circle
+const NN_RAY_LEN: usize = 12;   // points per ray
+const NN_RAY_DR: usize = 10;    // delta-radius for each point on ray
+const DEG_TO_RAD: f64 = 3.141593 / 180.0;
+const RAD_TO_DEG: f64 = 180.0 / 3.141593;
+
+const N_TYPES: usize = 4;         // wall, plant, herbiv., carniv.
 
 use crate::MAPSIZE;
 use crate::DELAY;
@@ -31,6 +40,7 @@ pub struct Herbivore {
     eaten: i32,
     gen: i32,
     main_handle: Sender<Msg>,
+    cause_of_death: String,
 }
 
 impl Herbivore {
@@ -60,7 +70,7 @@ impl Herbivore {
             eaten: 0,
             gen: gen,
             main_handle: handle,
-            //world: world,
+            cause_of_death: String::from("unknown"),
         }
     }
 }
@@ -152,18 +162,20 @@ impl Beast for Herbivore {
     fn starve(&mut self) {
         if self.energy < 0.0 {
             self.alive = false;
+            self.cause_of_death = String::from("starved");
         }
     }
     fn kill(&mut self) -> bool {
         if self.alive {
             self.alive = false;
+            self.cause_of_death = String::from("eaten");
             return true;
         }
         false
     }
 }
 
-pub fn main(mut h: Herbivore, delay: i32) {
+pub fn main(mut h: Herbivore) {
 
     let (tx, rx) = mpsc::channel::<BeastUpdate>();
     let receiver = tx.clone();
@@ -174,7 +186,9 @@ pub fn main(mut h: Herbivore, delay: i32) {
                                 //(msg.beast, msg.pos, msg.dir, msg.speed, msg.handle)
     let mut memory: HashMap<String, (String, (f64, f64), i32, f64, Sender<BeastUpdate>)> = HashMap::new();
 
-    let mut signals_nn = [[0;10];24];
+    let mut signals_nn = [[[0; NN_RAY_LEN]; NN_RAYS]; N_TYPES];
+
+    let mut keys_to_remove: Vec<String>=Vec::new();
 
     'herb_loop: while h.alive {
         let received = &rx;
@@ -191,7 +205,6 @@ pub fn main(mut h: Herbivore, delay: i32) {
                     spawn_child(&h, h.gen, h.main_handle.clone());
                     h.eaten -= CHILD_THRESH;
                 }
-                //println!("Eaten: {:?}", h.eaten);
             } else {
                 world = msg.world.unwrap();
             }
@@ -216,13 +229,13 @@ pub fn main(mut h: Herbivore, delay: i32) {
         // clear mamory from entries further away than RADIUS 
         //todo clear memory after time, forgetting
         memory.retain(|key, entry| 
-            point_within_radius(h.pos, entry.1, RADIUS));
+            point_within_radius(h.pos, entry.1, MEM_RADIUS));
 
         //println!("------ MEMORY ------");
         for key in memory.keys() {
             let entry = memory.get(key).unwrap();
             if point_within_radius(h.pos, entry.1, EAT_RANGE) 
-                && entry.0 == "Plant" {
+                && entry.0 == "Plant" { // herbivore can only act on plants
                 let eat_msg = BeastUpdate {
                     try_eat: true,
                     eat_result: false,
@@ -231,24 +244,38 @@ pub fn main(mut h: Herbivore, delay: i32) {
                     world: None,
                 };
                 match entry.4.send(eat_msg) {
-                    Ok(o) => {}
+                    Ok(o) => {}     //result doesn't matter, cant unwrap
                     Err(e) => {}
                 }
+                keys_to_remove.push(key.clone());
             }
         }
+        for key in &keys_to_remove {
+            memory.remove(key);
+        }
+        keys_to_remove.clear();
+
         //reset signals
         signals_nn.iter_mut().for_each(|m|
-             m.iter_mut().for_each(|m| *m = 111));
+             m.iter_mut().for_each(|m| *m = [0;NN_RAY_LEN]));
 
+        add_border(&mut signals_nn, h.pos, h.dir);
 
+        for key in memory.keys() {
+            let entry = memory.get(key).unwrap();
+            
+            let d = distance_index(h.pos, entry.1);
+            if d > NN_RAY_LEN-1 {continue}
+            let r = ray_direction_index(h.pos, h.dir, entry.1);
+            let mut index = 100; // make it crash if error
+            if entry.0 == "Wall"        {index = 0}
+            if entry.0 == "Plant"       {index = 1}
+            if entry.0 == "Herbivore"   {index = 2}
+            if entry.0 == "Carnivore"   {index = 3}
 
-        //todo add border
+            signals_nn[index][r][d] = 1;
 
-        //todo discrete values for entries
-        //todo position(angle, distance)
-        //todo type
-        //todo speed
-        //todo dir
+        }
         
         let index = rng.gen_range(0..6) as i32;
         match index {
@@ -278,14 +305,16 @@ pub fn main(mut h: Herbivore, delay: i32) {
         h.main_handle.send(msg).unwrap();
 
         //delay
-        thread::sleep(Duration::from_millis(delay.try_into().unwrap()));
+        thread::sleep(Duration::from_millis(DELAY.try_into().unwrap()));
 
         //DEBUG
         //println!("id: {:?}, pos: {:?}, energy: {:?}", h.get_id(), h.get_pos(), h.energy);
     }
 
     //after death
-    println!("{:?} died, generation: {:?}", h.get_id(), h.gen); //todo cause of death 
+    println!("{:?} died, generation: {:?}, cause of death: {}", 
+            h.get_id(),             h.gen,          h.cause_of_death);
+
     let msg = Msg{
         id:     h.get_id(),
         alive:  false,
@@ -370,6 +399,55 @@ fn spawn_child(parent: &impl Beast, generation: i32, main_handle: Sender<Msg>) {
         generation + 1,
         main_handle  
     );
-    thread::spawn( move || {main(child, DELAY)});
+    thread::spawn( move || {main(child)});
 }
 
+fn add_border(signals: &mut [[[i32; NN_RAY_LEN]; NN_RAYS]; N_TYPES], (pos_x, pos_y): (f64, f64), dir: i32) {
+    for ray in 0..=NN_RAYS-1 {
+        let ray_dir = (dir + (ray * 360/NN_RAYS) as i32)%360;
+        
+        for radius in 1..=NN_RAY_LEN {
+            let x = pos_x + NN_RAY_DR as f64 * (ray_dir as f64 * DEG_TO_RAD).cos() * radius as f64;
+            let y = pos_y + NN_RAY_DR as f64 * (ray_dir as f64 * DEG_TO_RAD).sin() * radius as f64;
+            if !in_bounds_bool(x, y) {
+                signals[0][ray][radius-1] = 1; //one-hot vector, wall == index 0
+
+                break
+            }
+        }
+    }
+}
+
+fn in_bounds_bool( x: f64, y: f64) -> bool {
+    if  x >= 0.0 
+    &&  x <= MAPSIZE as f64 
+    &&  y >= 0.0 
+    &&  y <= MAPSIZE as f64 {
+        return true;
+    } 
+    false
+}
+
+fn distance_index((self_x, self_y): (f64, f64), (othr_x, othr_y): (f64, f64)) -> usize {
+    let dx = self_x - othr_x;
+    let dy = self_y - othr_y;
+    let d = (dx.powf(2.0) + dy.powf(2.0)).sqrt();
+
+    (d/NN_RAY_DR as f64).round() as usize - 1
+}
+
+fn ray_direction_index ((self_x, self_y): (f64, f64), self_dir: i32, (othr_x, othr_y): (f64, f64)) -> usize {
+    let dx = othr_x - self_x;
+    let dy = othr_y - self_y;
+
+    let mut dir = (dy/dx).atan()*RAD_TO_DEG;
+    if dx < 0.0 { dir = dir + 180.0};       // account for quadrant
+
+    dir = dir - self_dir as f64;            // relative ange
+
+    if dir < 0.0 {dir += 360.0}             // positive degrees
+
+    dir = dir / (360.0 / NN_RAYS as f64);   // size of increments
+
+    dir.round() as usize % NN_RAYS
+}

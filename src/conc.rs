@@ -20,7 +20,7 @@ pub struct BeastUpdate {
     pub world: Option<Vec<((f64, f64), String, String, i32, i32, i32, f64, Sender<BeastUpdate>)>>, 
 }
 
-//todo impl Msg for many msg types
+//todo impl Msg for many msg types enums?
 
 pub struct MainServer {
     pub msg_type: String,

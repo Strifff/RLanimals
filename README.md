@@ -8,7 +8,9 @@ eats herbivores.
 
 - [ ] Reinforcement learning for beasts
 - [x] Concurrent threads for each beast
-- [ ] A simple web-based GUI
+- [x] A simple web-based GUI
+- [ ] GUI settings
+- [ ] Public hosting
 
 ## The journey
 
