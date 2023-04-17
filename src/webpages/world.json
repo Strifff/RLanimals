@@ -1,193 +1,193 @@
 {
   "entries": [
     {
+      "beast": "Herbivore",
+      "dir": 180,
+      "fov": 10,
+      "pos_x": 0.0,
+      "pos_y": 494.66358840420304,
+      "sight_range": 316,
+      "speed": 1.4872096401108275
+    },
+    {
       "beast": "Plant",
       "dir": 0,
       "fov": 0,
-      "pos_x": 329.0,
-      "pos_y": 310.0,
+      "pos_x": 334.0,
+      "pos_y": 206.0,
+      "sight_range": 0,
+      "speed": 0.0
+    },
+    {
+      "beast": "Plant",
+      "dir": 0,
+      "fov": 0,
+      "pos_x": 106.0,
+      "pos_y": 146.0,
       "sight_range": 0,
       "speed": 0.0
     },
     {
       "beast": "Herbivore",
-      "dir": 90,
-      "fov": 150,
-      "pos_x": 479.93608174950907,
-      "pos_y": 500.0,
-      "sight_range": 81,
-      "speed": 1.3813740830845966
+      "dir": 135,
+      "fov": 10,
+      "pos_x": 0.0,
+      "pos_y": 219.81593280070592,
+      "sight_range": 316,
+      "speed": 4.461628920332482
     },
     {
       "beast": "Herbivore",
-      "dir": 135,
-      "fov": 150,
-      "pos_x": 365.5311618862488,
-      "pos_y": 500.0,
-      "sight_range": 81,
-      "speed": 2.7627481661691933
+      "dir": 105,
+      "fov": 10,
+      "pos_x": 498.07540739638284,
+      "pos_y": 487.12107342933734,
+      "sight_range": 316,
+      "speed": 2.974419280221655
+    },
+    {
+      "beast": "Herbivore",
+      "dir": 330,
+      "fov": 10,
+      "pos_x": 500.0,
+      "pos_y": 0.0,
+      "sight_range": 316,
+      "speed": 4.461628920332482
     },
     {
       "beast": "Plant",
       "dir": 0,
       "fov": 0,
-      "pos_x": 45.0,
-      "pos_y": 71.0,
+      "pos_x": 178.0,
+      "pos_y": 341.0,
+      "sight_range": 0,
+      "speed": 0.0
+    },
+    {
+      "beast": "Herbivore",
+      "dir": 75,
+      "fov": 10,
+      "pos_x": 18.904892045144283,
+      "pos_y": 365.6830430160856,
+      "sight_range": 316,
+      "speed": 2.974419280221655
+    },
+    {
+      "beast": "Herbivore",
+      "dir": 240,
+      "fov": 10,
+      "pos_x": 241.47174875552616,
+      "pos_y": 72.14186922111747,
+      "sight_range": 316,
+      "speed": 1.4872096401108275
+    },
+    {
+      "beast": "Herbivore",
+      "dir": 15,
+      "fov": 10,
+      "pos_x": 500.0,
+      "pos_y": 306.63334802339904,
+      "sight_range": 316,
+      "speed": 4.461628920332482
+    },
+    {
+      "beast": "Herbivore",
+      "dir": 195,
+      "fov": 10,
+      "pos_x": 189.22387944938504,
+      "pos_y": 93.30485766368778,
+      "sight_range": 316,
+      "speed": 1.4872096401108275
+    },
+    {
+      "beast": "Plant",
+      "dir": 0,
+      "fov": 0,
+      "pos_x": 62.0,
+      "pos_y": 283.0,
+      "sight_range": 0,
+      "speed": 0.0
+    },
+    {
+      "beast": "Plant",
+      "dir": 0,
+      "fov": 0,
+      "pos_x": 227.0,
+      "pos_y": 291.0,
+      "sight_range": 0,
+      "speed": 0.0
+    },
+    {
+      "beast": "Herbivore",
+      "dir": 315,
+      "fov": 10,
+      "pos_x": 500.0,
+      "pos_y": 191.8020440057275,
+      "sight_range": 316,
+      "speed": 4.461628920332482
+    },
+    {
+      "beast": "Plant",
+      "dir": 0,
+      "fov": 0,
+      "pos_x": 483.0,
+      "pos_y": 455.0,
+      "sight_range": 0,
+      "speed": 0.0
+    },
+    {
+      "beast": "Herbivore",
+      "dir": 210,
+      "fov": 10,
+      "pos_x": 150.8923187684465,
+      "pos_y": 0.0,
+      "sight_range": 316,
+      "speed": 4.461628920332482
+    },
+    {
+      "beast": "Plant",
+      "dir": 0,
+      "fov": 0,
+      "pos_x": 393.0,
+      "pos_y": 435.0,
+      "sight_range": 0,
+      "speed": 0.0
+    },
+    {
+      "beast": "Plant",
+      "dir": 0,
+      "fov": 0,
+      "pos_x": 261.0,
+      "pos_y": 223.0,
       "sight_range": 0,
       "speed": 0.0
     },
     {
       "beast": "Herbivore",
       "dir": 30,
-      "fov": 150,
-      "pos_x": 63.11604523596251,
-      "pos_y": 6.455206755489489,
-      "sight_range": 81,
-      "speed": 1.3813740830845966
-    },
-    {
-      "beast": "Herbivore",
-      "dir": 300,
-      "fov": 150,
+      "fov": 10,
       "pos_x": 500.0,
-      "pos_y": 363.93642790077905,
-      "sight_range": 81,
-      "speed": 4.14412224925379
-    },
-    {
-      "beast": "Plant",
-      "dir": 0,
-      "fov": 0,
-      "pos_x": 364.0,
-      "pos_y": 316.0,
-      "sight_range": 0,
-      "speed": 0.0
+      "pos_y": 301.94215589022616,
+      "sight_range": 316,
+      "speed": 1.4872096401108275
     },
     {
       "beast": "Herbivore",
-      "dir": 270,
-      "fov": 150,
-      "pos_x": 6.460048098029438e-6,
-      "pos_y": 0.0,
-      "sight_range": 81,
-      "speed": 1.3813740830845966
-    },
-    {
-      "beast": "Herbivore",
-      "dir": 240,
-      "fov": 150,
-      "pos_x": 443.34023234904913,
-      "pos_y": 0.0,
-      "sight_range": 81,
-      "speed": 2.7627481661691933
-    },
-    {
-      "beast": "Herbivore",
-      "dir": 0,
-      "fov": 150,
-      "pos_x": 500.0,
-      "pos_y": 448.18526136037536,
-      "sight_range": 81,
-      "speed": 1.3813740830845966
-    },
-    {
-      "beast": "Plant",
-      "dir": 0,
-      "fov": 0,
-      "pos_x": 241.0,
-      "pos_y": 417.0,
-      "sight_range": 0,
-      "speed": 0.0
-    },
-    {
-      "beast": "Herbivore",
-      "dir": 60,
-      "fov": 150,
-      "pos_x": 496.91899370033366,
+      "dir": 75,
+      "fov": 10,
+      "pos_x": 495.83492934912704,
       "pos_y": 500.0,
-      "sight_range": 81,
-      "speed": 4.14412224925379
-    },
-    {
-      "beast": "Plant",
-      "dir": 0,
-      "fov": 0,
-      "pos_x": 230.0,
-      "pos_y": 424.0,
-      "sight_range": 0,
-      "speed": 0.0
+      "sight_range": 316,
+      "speed": 4.461628920332482
     },
     {
       "beast": "Herbivore",
-      "dir": 225,
-      "fov": 150,
-      "pos_x": 0.0,
-      "pos_y": 465.61791295262253,
-      "sight_range": 81,
-      "speed": 1.3813740830845966
-    },
-    {
-      "beast": "Plant",
-      "dir": 0,
-      "fov": 0,
-      "pos_x": 357.0,
-      "pos_y": 162.0,
-      "sight_range": 0,
-      "speed": 0.0
-    },
-    {
-      "beast": "Herbivore",
-      "dir": 300,
-      "fov": 150,
-      "pos_x": 325.3981663965029,
-      "pos_y": 0.0,
-      "sight_range": 81,
-      "speed": 2.7627481661691933
-    },
-    {
-      "beast": "Herbivore",
-      "dir": 180,
-      "fov": 150,
-      "pos_x": 0.0,
-      "pos_y": 255.46566467700703,
-      "sight_range": 81,
-      "speed": 4.14412224925379
-    },
-    {
-      "beast": "Herbivore",
-      "dir": 240,
-      "fov": 150,
-      "pos_x": 0.0,
-      "pos_y": 10.962400409019143,
-      "sight_range": 81,
-      "speed": 1.3813740830845966
-    },
-    {
-      "beast": "Herbivore",
-      "dir": 225,
-      "fov": 150,
-      "pos_x": 0.0,
-      "pos_y": 236.14491620169522,
-      "sight_range": 81,
-      "speed": 1.3813740830845966
-    },
-    {
-      "beast": "Herbivore",
-      "dir": 210,
-      "fov": 150,
-      "pos_x": 151.42778479410924,
-      "pos_y": 0.0,
-      "sight_range": 81,
-      "speed": 4.14412224925379
-    },
-    {
-      "beast": "Herbivore",
-      "dir": 180,
-      "fov": 150,
-      "pos_x": 296.02000278660836,
-      "pos_y": 0.0,
-      "sight_range": 81,
-      "speed": 1.3813740830845966
+      "dir": 330,
+      "fov": 10,
+      "pos_x": 317.051163411928,
+      "pos_y": 348.9740043752864,
+      "sight_range": 316,
+      "speed": 2.974419280221655
     }
   ]
 }

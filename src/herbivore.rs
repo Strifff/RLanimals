@@ -8,6 +8,8 @@ use crate::mpsc::{Sender/*,Receiver*/};
 use std::sync::{/*Arc, Mutex,*/ mpsc};
 use rand::Rng;
 use nanoid::nanoid;
+//use tch::Tensor;
+
 
                                 // forget objects far away
 const MEM_RADIUS: i32 = ((NN_RAY_LEN as f64 + 1.5 )*NN_RAY_DR as f64) as i32;    
@@ -189,6 +191,11 @@ pub fn main(mut h: Herbivore) {
     let mut signals_nn = [[[0; NN_RAY_LEN]; NN_RAYS]; N_TYPES];
 
     let mut keys_to_remove: Vec<String>=Vec::new();
+
+    /*let t = Tensor::of_slice(&[3, 1, 4, 1, 5]);
+    let t = t * 2;
+    t.print();
+    process::exit(1);*/
 
     'herb_loop: while h.alive {
         let received = &rx;
@@ -433,7 +440,9 @@ fn distance_index((self_x, self_y): (f64, f64), (othr_x, othr_y): (f64, f64)) ->
     let dy = self_y - othr_y;
     let d = (dx.powf(2.0) + dy.powf(2.0)).sqrt();
 
-    (d/NN_RAY_DR as f64).round() as usize - 1
+    //todo BROKEN after pytorch install
+    //todo subtract with overflow error
+    (d/NN_RAY_DR as f64).round() as usize
 }
 
 fn ray_direction_index ((self_x, self_y): (f64, f64), self_dir: i32, (othr_x, othr_y): (f64, f64)) -> usize {
