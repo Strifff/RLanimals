@@ -433,7 +433,7 @@ fn distance_index((self_x, self_y): (f64, f64), (othr_x, othr_y): (f64, f64)) ->
     let dy = self_y - othr_y;
     let d = (dx.powf(2.0) + dy.powf(2.0)).sqrt();
 
-    (d/NN_RAY_DR as f64).round() as usize - 1
+    (d/(NN_RAY_DR as f64)).round() as usize
 }
 
 fn ray_direction_index ((self_x, self_y): (f64, f64), self_dir: i32, (othr_x, othr_y): (f64, f64)) -> usize {

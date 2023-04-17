@@ -22,7 +22,7 @@ const FPS: i32 = 100;
 const DELAY: i32 = 1000/FPS;
 const MAPSIZE: i32 = 500;
 const FOV: i32 = 100;
-const N_HERB: i32 = 1;
+const N_HERB: i32 = 3;
 const PLANT_FREQ: i32 = 5; //set value between 0..100
 
 fn main(){
