@@ -60,4 +60,4 @@ due to difficuly to share across threads, message passing is used both ways now.
 
 ![Drunk bird movemnet](images/drunk_birds.gif)
 
-![Fov](images/Apr-15-2023%2011-51-13.gif)
+![Fov](images/eat_spawn_children.gif)
