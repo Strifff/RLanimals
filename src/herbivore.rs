@@ -9,6 +9,7 @@ use std::sync::{/*Arc, Mutex,*/ mpsc};
 use rand::Rng;
 use nanoid::nanoid;
 
+use tch::Tensor;
                                 // forget objects far away
 const MEM_RADIUS: i32 = ((NN_RAY_LEN as f64 + 1.5 )*NN_RAY_DR as f64) as i32;    
 const EAT_RANGE: i32 = 50;
@@ -265,7 +266,7 @@ pub fn main(mut h: Herbivore) {
             let entry = memory.get(key).unwrap();
             
             let d = distance_index(h.pos, entry.1);
-            if d > NN_RAY_LEN-1 {continue}
+            if d > NN_RAY_LEN-1 {continue} //memory larger than vision
             let r = ray_direction_index(h.pos, h.dir, entry.1);
             let mut index = 100; // make it crash if error
             if entry.0 == "Wall"        {index = 0}
@@ -276,7 +277,16 @@ pub fn main(mut h: Herbivore) {
             signals_nn[index][r][d] = 1;
 
         }
-        
+
+        //println!("");
+        //println!("{:?}", signals_nn[0]);
+
+        //let plant_tensor = Tensor::new(&[NN_RAYS, NN_RAY_LEN]).with_values(&signals_nn[0]).unwrap();
+        let mut x = Tensor::new(); //.with_values(&[0_i32, 1, 2, 3]).unwrap();
+        //x = Tensor::slice_copy(&x, 2, 0, 10, 10); signals_nn[0];
+        //let t = Tensor::new((&signals_nn[0][0]).values());
+        //println!("Tensor: {:?}", t );
+
         let index = rng.gen_range(0..6) as i32;
         match index {
             0 => {h.set_speed1()}
