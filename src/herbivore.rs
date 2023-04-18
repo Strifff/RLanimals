@@ -282,10 +282,11 @@ pub fn main(mut h: Herbivore) {
         //println!("{:?}", signals_nn[0]);
 
         //let plant_tensor = Tensor::new(&[NN_RAYS, NN_RAY_LEN]).with_values(&signals_nn[0]).unwrap();
-        let mut x = Tensor::new(); //.with_values(&[0_i32, 1, 2, 3]).unwrap();
+        //let mut x = Tensor::new(); //.with_values(&[0_i32, 1, 2, 3]).unwrap();
         //x = Tensor::slice_copy(&x, 2, 0, 10, 10); signals_nn[0];
         //let t = Tensor::new((&signals_nn[0][0]).values());
-        //println!("Tensor: {:?}", t );
+        let t = Tensor::of_slice(&signals_nn[0]);
+        println!("Tensor: {:?}", t.dim() );
 
         let index = rng.gen_range(0..6) as i32;
         match index {
