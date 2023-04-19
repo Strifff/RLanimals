@@ -9,7 +9,10 @@ use std::sync::{/*Arc, Mutex,*/ mpsc};
 use rand::Rng;
 use nanoid::nanoid;
 
+use serde_json::de;
 use tch::Tensor;
+
+//todo memory range 1.5x vision range, same amount of steps
                                 // forget objects far away
 const MEM_RADIUS: i32 = ((NN_RAY_LEN as f64 + 1.5 )*NN_RAY_DR as f64) as i32;    
 const EAT_RANGE: i32 = 50;
@@ -217,7 +220,6 @@ pub fn main(mut h: Herbivore) {
             &&                           //     and
             in_view(&h,  *other_pos)); // other in field of view
 
-        //todo append from memory
         //memory as hashmap to overwrite the old position
         for entry in &world {
             let id = entry.1.clone();
@@ -277,16 +279,26 @@ pub fn main(mut h: Herbivore) {
             signals_nn[index][r][d] = 1;
 
         }
+        //let x = Tensor::randn(&[2, 3, 4], (tch::Kind::Int64, tch::Device::Cpu));
 
-        //println!("");
-        //println!("{:?}", signals_nn[0]);
+        // input of world state
+        let mut wall_tensor:    Tensor    = Tensor::of_slice2(&signals_nn[0]);
+        let mut plant_tensor:   Tensor    = Tensor::of_slice2(&signals_nn[1]);
+        let mut herbiv_tensor:  Tensor    = Tensor::of_slice2(&signals_nn[2]);
+        let mut carniv_tensor:  Tensor    = Tensor::of_slice2(&signals_nn[3]);
 
-        //let plant_tensor = Tensor::new(&[NN_RAYS, NN_RAY_LEN]).with_values(&signals_nn[0]).unwrap();
-        //let mut x = Tensor::new(); //.with_values(&[0_i32, 1, 2, 3]).unwrap();
-        //x = Tensor::slice_copy(&x, 2, 0, 10, 10); signals_nn[0];
-        //let t = Tensor::new((&signals_nn[0][0]).values());
-        let t = Tensor::of_slice(&signals_nn[0]);
-        println!("Tensor: {:?}", t.dim() );
+        //input of self state
+        let mut beast_state: Tensor     = Tensor::of_slice(&[h.speed_base, h.speed_curr, h.energy]);
+
+        let device = tch::Device::cuda_if_available();
+        let vs = tch::nn::VarStore::new(device);
+        //wall_tensor.print();
+
+        let model = model(&vs.root(), 4);
+
+
+        process::exit(1);
+
 
         let index = rng.gen_range(0..6) as i32;
         match index {
@@ -461,4 +473,35 @@ fn ray_direction_index ((self_x, self_y): (f64, f64), self_dir: i32, (othr_x, ot
     dir = dir / (360.0 / NN_RAYS as f64);   // size of increments
 
     dir.round() as usize % NN_RAYS
+}
+
+use tch::kind::{FLOAT_CPU, INT64_CPU};
+use tch::{nn, nn::OptimizerConfig, Kind::Float};
+
+type Model = Box<dyn Fn(&Tensor) -> (Tensor, Tensor)>;
+
+fn model(p: &nn::Path, nact: i64) -> Model {
+    let stride = |s| nn::ConvConfig { stride: s, ..Default::default() };
+    let seq = nn::seq()
+        .add(nn::linear(p, (NN_RAYS*NN_RAY_LEN) as i64, 100, Default::default()))
+        .add_fn(|xs| xs.relu())
+        .add(nn::linear(p, 100, nact, Default::default()))
+        .add_fn(|xs| xs.relu());
+
+        /*.add(nn::conv2d(p / "c1", NSTACK, 32, 8, stride(4)))
+        .add_fn(|xs| xs.relu())
+        .add(nn::conv2d(p / "c2", 32, 64, 4, stride(2)))
+        .add_fn(|xs| xs.relu())
+        .add(nn::conv2d(p / "c3", 64, 64, 3, stride(1)))
+        .add_fn(|xs| xs.relu().flat_view())
+        .add(nn::linear(p / "l1", 3136, 512, Default::default()))
+        .add_fn(|xs| xs.relu());*/
+
+    let critic = nn::linear(p / "cl", 512, 1, Default::default());
+    let actor = nn::linear(p / "al", 512, nact, Default::default());
+    let device = p.device();
+    Box::new(move |xs: &Tensor| {
+        let xs = xs.to_device(device).apply(&seq);
+        (xs.apply(&critic), xs.apply(&actor))
+    })
 }

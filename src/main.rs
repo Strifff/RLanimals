@@ -22,7 +22,7 @@ const FPS: i32 = 100;
 const DELAY: i32 = 1000/FPS;
 const MAPSIZE: i32 = 500;
 const FOV: i32 = 10;
-const N_HERB: i32 = 3;
+const N_HERB: i32 = 1;
 const PLANT_FREQ: i32 = 5; //set value between 0..100
 
 fn main(){
@@ -46,12 +46,12 @@ fn main(){
         //println!("Msg value: {:?}", msg.msg_data);
     }
 
-    // todo world with 2x capacity
-
     // mailbox
     let (tx, rx) = mpsc::channel::<Msg>();
 
-    // spawn Herbivores //todo make fucntion
+    //todo herbivore ac thread
+    //todo carnivore ac thread
+    // spawn Herbivores 
     for _ in 1..=N_HERB {
         let id = nanoid!();
         println!("Spawned: {:?}", id);
