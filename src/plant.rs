@@ -5,6 +5,9 @@ use std::{thread, time::Duration};
 
 use rand::Rng;
 
+use crate::MAPSIZE;
+use crate::DELAY;
+
 const ENERGY_LOW: i32 = 10;
 const ENERGY_HIGH: i32 = 30;
 
@@ -59,7 +62,7 @@ impl Plant {
     }
 }
 
-pub fn main(mut p: Plant, delay: i32) {
+pub fn main(mut p: Plant) {
     let (tx, rx) = mpsc::channel::<BeastUpdate>();
     let init_msg = Msg {
         id: p.get_id(),
@@ -75,7 +78,7 @@ pub fn main(mut p: Plant, delay: i32) {
     p.main_handle.send(init_msg).unwrap();
     //init main with static state
 
-    'plantloop: while p.alive {
+    'plant_loop: while p.alive {
         //receive
         let received = &rx;
 
@@ -90,15 +93,12 @@ pub fn main(mut p: Plant, delay: i32) {
                 };
                 let _ = msg.response_handle.unwrap().send(response);
                 p.alive = false;
-
-                //println!("Plant {:?} got eaten", p.id);
-
-                break 'plantloop
+                break 'plant_loop
             } //plant does not care about worldly things
         }
 
-        //delay                                   v- plant is slow, doesn't care
-        thread::sleep(Duration::from_millis((5*delay).try_into().unwrap()));
+        //delay                                
+        thread::sleep(Duration::from_millis((DELAY).try_into().unwrap()));
     }
     let death_msg = Msg {
         id: p.get_id(),
@@ -112,8 +112,5 @@ pub fn main(mut p: Plant, delay: i32) {
         handle: tx.clone(),
     };
     p.main_handle.send(death_msg).unwrap(); 
-
-
-
 }
 

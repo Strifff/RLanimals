@@ -1,3 +1,31 @@
 {
-  "entries": []
+  "entries": [
+    {
+      "beast": "Plant",
+      "dir": 0,
+      "fov": 0,
+      "pos_x": 220.0,
+      "pos_y": 169.0,
+      "sight_range": 0,
+      "speed": 0.0
+    },
+    {
+      "beast": "Herbivore",
+      "dir": 240,
+      "fov": 10,
+      "pos_x": 0.0,
+      "pos_y": 311.7717030131395,
+      "sight_range": 316,
+      "speed": 5.178179593884357
+    },
+    {
+      "beast": "Plant",
+      "dir": 0,
+      "fov": 0,
+      "pos_x": 471.0,
+      "pos_y": 359.0,
+      "sight_range": 0,
+      "speed": 0.0
+    }
+  ]
 }

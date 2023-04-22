@@ -1,17 +1,21 @@
-use tch::{nn, nn::Module, nn::OptimizerConfig, nn::VarStore, Tensor};
+use tch::{nn, nn::Module, nn::OptimizerConfig, nn::VarStore, Tensor, Kind};
 
-struct ActorCritic {
+use crate::{NN_RAYS, NN_RAY_DR, NN_RAY_LEN, N_TYPES};
+
+pub struct ActorCritic {
     actor: nn::Sequential,
     critic: nn::Sequential,
 }
 
 impl ActorCritic {
-    fn new(vs: &VarStore, input_size: i64, hidden_size: i64, num_actions: i64) -> ActorCritic {
+    pub fn new(vs: &VarStore, input_size: i64, num_actions: i64) -> ActorCritic {
+        let hidden_size: i64 = 512; //todo temp
+
         let actor = nn::seq()
             .add(nn::linear(vs.root(), input_size, hidden_size, Default::default()))
             .add_fn(|xs| xs.relu())
             .add(nn::linear(vs.root(), hidden_size, num_actions, Default::default()))
-            .add_fn(|xs| xs.softmax(-1));
+            .add_fn(|xs| xs.softmax(-1,Kind::Float));
 
         let critic = nn::seq()
             .add(nn::linear(vs.root(), input_size, hidden_size, Default::default()))
@@ -21,22 +25,22 @@ impl ActorCritic {
         ActorCritic { actor, critic }
     }
 
-    fn forward(&self, x: &Tensor) -> (Tensor, Tensor) {
-        let actor_output = self.actor.forward(&x);
-        let critic_output = self.critic.forward(&x);
+    pub fn forward(&self, t1: &Tensor) -> (Tensor, Tensor) {
+        let actor_output = self.actor.forward(&t1);
+        let critic_output = self.critic.forward(&t1);
         (actor_output, critic_output)
     }
 }
 
 fn main() {
-    let vs = VarStore::new(tch::Device::Cuda(0));
+    let vs = VarStore::new(tch::Device::Cpu);
 
     let num_actions = 3;
     let input_size = 4;
     let hidden_size = 128;
     let lr = 1e-3;
 
-    let model = ActorCritic::new(&vs, input_size, hidden_size, num_actions);
+    let model = ActorCritic::new(&vs, input_size, num_actions);
 
     let mut optimizer = nn::Adam::default().build(&vs, lr).unwrap();
 
@@ -67,10 +71,10 @@ fn main() {
         let log_probs = model
             .actor
             .forward(&Tensor::cat(&states, 0))
-            .log_softmax(-1);
-        let actor_loss = -(advantages * log_probs.gather(-1, &Tensor::cat(&actions, 0))).mean();
-        let critic_loss = advantages.pow(2).mean();
-        let loss = actor_loss + 0.5 * critic_loss;
+            .log_softmax(-1,Kind::Float);
+        let actor_loss = -(advantages * log_probs.gather(-1, &Tensor::cat(&actions, 0), false)).mean(Kind::Float);
+        //let critic_loss = advantages.pow(&Tensor::of_slice(&[2])).mean(Kind::Float);
+        let loss: Tensor = actor_loss;// + 0.5 * critic_loss;
 
         optimizer.zero_grad();
         loss.backward();

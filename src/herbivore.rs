@@ -2,33 +2,29 @@ use crate::beast_traits::{Beast, Actor};
 use std::collections::HashMap;
 use std::process;
 use std::{/*cmp::Ordering,*/ thread, time::Duration, convert::TryInto};
+use tch::{nn, nn::Module, nn::OptimizerConfig, nn::VarStore, Tensor, Kind};
+use tch::kind::{FLOAT_CPU, INT64_CPU};
 
 use crate::conc::{Msg, BeastUpdate};
 use crate::mpsc::{Sender/*,Receiver*/};
+use crate::A2C::{ActorCritic};
 use std::sync::{/*Arc, Mutex,*/ mpsc};
 use rand::Rng;
 use nanoid::nanoid;
 
 use serde_json::de;
-use tch::Tensor;
+
+// make environment discrete
+use crate::MAPSIZE;
+use crate::DELAY;
+use crate::{NN_RAYS, NN_RAY_DR, NN_RAY_LEN, N_TYPES, N_STATES_SELF};
+use crate::{RAD_TO_DEG, DEG_TO_RAD};
 
 //todo memory range 1.5x vision range, same amount of steps
                                 // forget objects far away
 const MEM_RADIUS: i32 = ((NN_RAY_LEN as f64 + 1.5 )*NN_RAY_DR as f64) as i32;    
 const EAT_RANGE: i32 = 50;
 const CHILD_THRESH: i32 = 50;   // food to spawn child
-
-// make environment discrete
-const NN_RAYS: usize = 24;      // directions for the input of a beast, full circle
-const NN_RAY_LEN: usize = 12;   // points per ray
-const NN_RAY_DR: usize = 10;    // delta-radius for each point on ray
-const DEG_TO_RAD: f64 = 3.141593 / 180.0;
-const RAD_TO_DEG: f64 = 180.0 / 3.141593;
-
-const N_TYPES: usize = 4;         // wall, plant, herbiv., carniv.
-
-use crate::MAPSIZE;
-use crate::DELAY;
 
 
 pub struct Herbivore {
@@ -194,6 +190,16 @@ pub fn main(mut h: Herbivore) {
 
     let mut keys_to_remove: Vec<String>=Vec::new();
 
+    let mut vs = VarStore::new(tch::Device::Cpu); 
+    vs.load("src/nn/weights/herbi/herbi_ac").unwrap();
+    
+    let herbivore_ac= ActorCritic::new(
+        &vs,
+        (NN_RAYS*NN_RAY_LEN*N_TYPES + N_STATES_SELF) as i64,
+        4);
+    let t1 = Tensor::new();
+    let t2 = Tensor::new();
+
     'herb_loop: while h.alive {
         let received = &rx;
  
@@ -294,10 +300,10 @@ pub fn main(mut h: Herbivore) {
         let vs = tch::nn::VarStore::new(device);
         //wall_tensor.print();
 
-        let model = model(&vs.root(), 4);
+        //let model = model(&vs.root(), 4);
 
 
-        process::exit(1);
+        //process::exit(1);
 
 
         let index = rng.gen_range(0..6) as i32;
@@ -475,8 +481,7 @@ fn ray_direction_index ((self_x, self_y): (f64, f64), self_dir: i32, (othr_x, ot
     dir.round() as usize % NN_RAYS
 }
 
-use tch::kind::{FLOAT_CPU, INT64_CPU};
-use tch::{nn, nn::OptimizerConfig, Kind::Float};
+
 
 type Model = Box<dyn Fn(&Tensor) -> (Tensor, Tensor)>;
 
