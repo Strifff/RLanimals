@@ -5,7 +5,7 @@ mod conc;
 mod plant;
 mod A2C;
 
-use std::{thread, time::Duration, sync::mpsc, collections::HashMap};
+use std::{thread, time::Duration, sync::mpsc, collections::HashMap, process};
 use tch::{nn, nn::Module, nn::OptimizerConfig, nn::VarStore, Tensor, Kind};
 use rand::{Rng, thread_rng};
 use nanoid::nanoid;
@@ -23,7 +23,7 @@ const FPS: i32 = 100;
 const DELAY: i32 = 1000/FPS;
 const MAPSIZE: i32 = 500;
 const FOV: i32 = 10;
-const N_HERB: i32 = 1;
+const N_HERB: i32 = 10;
 const PLANT_FREQ: i32 = 1; //set value between 1..100
 
 //NN parameters
@@ -67,14 +67,27 @@ fn main(){
     let vs_carni = VarStore::new(tch::Device::Cpu);    
     vs_carni.save("src/nn/weights/carni/carni_ac").unwrap();
 
+    let mut iteration = 0;
     'train_loop: loop {
-        //todo train network
+        if iteration != 0 {
+            //todo train networks
+            //train
+            train("Herbivore");
+
+
+            //delete old states
+
+        }
+
 
         // reset world
         world.clear();
+
         // spawn herbi and carni //todo inherit traits
         spawn_herbi(tx.clone());
+
         //todo spawn carni
+
         println!("Simulation started");
         'sim_loop: loop {
             // receive beast/plant states
@@ -157,6 +170,7 @@ fn main(){
             // delay
             thread::sleep(Duration::from_millis(DELAY.try_into().unwrap()));
         }
+        iteration += 1;
     }
 }
 
@@ -184,4 +198,42 @@ fn spawn_herbi(main_handle: Sender<Msg>) {
         );
         thread::spawn(move || {herbivore::main(h)});
     }
+}
+
+fn train(beast: &str) {
+    /*let mut vs = VarStore::new(tch::Device::Cpu);
+    if beast == "Herbivore" {
+        vs.load("src/nn/weights/herbi/herbi_ac").unwrap();
+
+    } else if beast == "Carnivore" {
+        vs.load("src/nn/weights/carni/carni_ac").unwrap();
+    } else {
+        println!("error in train");
+        process::exit(1);
+    }
+    
+    let model = ActorCritic::new(
+        &vs,
+        (NN_RAYS*NN_RAY_LEN*N_TYPES + N_STATES_SELF) as i64,
+        7
+    );
+
+    let (_, values) = model.forward(&Tensor::cat(&states, 0));
+    let values = values.squeeze();
+    let advantages = Tensor::cat(&rewards, 0) - values;
+    let value_targets = Tensor::cat(&rewards, 0);
+    
+
+    // Compute actor and critic losses
+    let log_probs = model
+        .actor
+        .forward(&Tensor::cat(&states, 0))
+        .log_softmax(-1,Kind::Float);
+    let actor_loss = -(advantages * log_probs.gather(-1, &Tensor::cat(&actions, 0), false)).mean(Kind::Float);
+    let critic_loss = advantages.pow(&Tensor::of_slice(&[2])).mean(Kind::Float);
+    let loss: Tensor = actor_loss;// + 0.5 * critic_loss;
+
+    optimizer.zero_grad();
+    loss.backward();
+    optimizer.step();*/
 }

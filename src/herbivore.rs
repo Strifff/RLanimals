@@ -1,18 +1,17 @@
 use crate::beast_traits::{Beast, Actor};
 use std::collections::HashMap;
-use std::process;
+use std::{process};
 use std::{/*cmp::Ordering,*/ thread, time::Duration, convert::TryInto};
 use tch::{nn, nn::Module, nn::OptimizerConfig, nn::VarStore, Tensor, Kind};
 use tch::kind::{FLOAT_CPU, INT64_CPU};
 
 use crate::conc::{Msg, BeastUpdate};
 use crate::mpsc::{Sender/*,Receiver*/};
-use crate::A2C::{ActorCritic};
+use crate::A2C::{ActorCritic, States};
 use std::sync::{/*Arc, Mutex,*/ mpsc};
 use rand::Rng;
 use nanoid::nanoid;
-
-use serde_json::de;
+use serde_json::{json, Value};
 
 // make environment discrete
 use crate::MAPSIZE;
@@ -25,6 +24,11 @@ use crate::{RAD_TO_DEG, DEG_TO_RAD};
 const MEM_RADIUS: i32 = ((NN_RAY_LEN as f64 + 1.5 )*NN_RAY_DR as f64) as i32;    
 const EAT_RANGE: i32 = 50;
 const CHILD_THRESH: i32 = 50;   // food to spawn child
+const SCORE_EAT: i32 = 50;
+const SCORE_SURVIVE: i32 = 1;
+const SCORE_DIE: i32 = -100;
+
+const ENERGY_MAX: f64 = 5000.0;
 
 
 pub struct Herbivore {
@@ -63,7 +67,7 @@ impl Herbivore {
                 15*rng.gen_range(0..24) },
             speed_base: speed,
             speed_curr: speed,
-            energy: 5000.0,
+            energy: ENERGY_MAX,
             fov: fov,
             sight_range: { let sr = 1000.0*(1.0/fov as f64).sqrt();
                             sr as i32},
@@ -196,17 +200,38 @@ pub fn main(mut h: Herbivore) {
     let herbivore_ac= ActorCritic::new(
         &vs,
         (NN_RAYS*NN_RAY_LEN*N_TYPES + N_STATES_SELF) as i64,
-        4
+        7
     );
 
+    let mut training_states: Vec<States> = Vec::new();
 
+    // state = pos, dir, speed vs base, energy vs max, eaten vs child_thresh
+    let mut self_state: ((f64,f64), i32, f64, f64, f64) = ((0.0,0.0),0, 1.0, 1.0, 0.0);
+    let mut mem: Vec<(String, (f64, f64), i32, f64)> = Vec::new();
+    let mut action: i64 = 0;
+    let mut reward: f64 = 0.0;
+
+    let mut state = States {
+        state: self_state,
+        memory: mem,
+        action: action,
+        reward: reward,
+        state_new: self_state
+    };
+    let mut memory_vec: Vec<(String, (f64, f64), i32, f64)> = Vec::new();
+
+    let mut first_it: bool = true;
     'herb_loop: while h.alive {
         let received = &rx;
+
+        //reset reward
+        reward = 0.0;
  
         world.clear();
         for msg in received.try_iter() {
             if msg.try_eat && h.alive {
                 //todo respond to carnivore
+                reward += SCORE_DIE as f64;
                 break 'herb_loop;
             } else if msg.eat_result {
                 h.eaten += msg.eat_value;
@@ -215,9 +240,16 @@ pub fn main(mut h: Herbivore) {
                     spawn_child(&h, h.gen, h.main_handle.clone());
                     h.eaten -= CHILD_THRESH;
                 }
+                reward += SCORE_EAT as f64;
             } else {
                 world = msg.world.unwrap();
             }
+        }
+        state.reward = reward;
+
+        //submit state 
+        if !first_it {
+            training_states.push(state.clone());
         }
 
         //take action
@@ -240,7 +272,20 @@ pub fn main(mut h: Herbivore) {
         memory.retain(|key, entry| 
             point_within_radius(h.pos, entry.1, MEM_RADIUS));
 
-        //println!("------ MEMORY ------");
+        memory_vec.clear();
+        for key in memory.keys(){
+            let entry = memory.get(key).unwrap();
+            let beast = entry.0.to_owned();
+            let mem_learn: (String, (f64, f64), i32, f64) = (
+                beast,
+                entry.1,
+                entry.2,
+                entry.3
+            );
+            memory_vec.push(mem_learn);
+        }
+        state.memory = memory_vec.clone();
+        
         for key in memory.keys() {
             let entry = memory.get(key).unwrap();
             if point_within_radius(h.pos, entry.1, EAT_RANGE) 
@@ -259,10 +304,11 @@ pub fn main(mut h: Herbivore) {
                 keys_to_remove.push(key.clone());
             }
         }
+
         for key in &keys_to_remove {
             memory.remove(key);
         }
-        keys_to_remove.clear();
+        keys_to_remove.clear(); 
 
         //reset signals
         signals_nn.iter_mut().for_each(|m|
@@ -296,20 +342,16 @@ pub fn main(mut h: Herbivore) {
         //input of self state
         let mut beast_state: Tensor     = Tensor::of_slice(&[h.speed_base, h.speed_curr, h.energy]);
 
-        let temp = herbivore_ac.forward(
+        let (action_prob, value) = herbivore_ac.forward(
             &wall_tensor,
             &plant_tensor
         );
 
-        /*let (action_prob, value) = model.forward(&state);
         let action = action_prob.multinomial(1, true);
-        let reward = Tensor::randn(&[], (tch::Kind::Float, tch::Device::Cpu));*/
+        state.action = i64::from(&action);
+        state.state = self_state;
 
-        //process::exit(1);
-
-
-        let index = rng.gen_range(0..6) as i32;
-        match index {
+        match i64::from(action) {
             0 => {h.set_speed1()}
             1 => {h.set_speed2()}
             2 => {h.set_speed3()}
@@ -317,8 +359,20 @@ pub fn main(mut h: Herbivore) {
             4 => {h.left()}
             5 => {h.right()}
             6 => {h.back()}
-            _ => {}
+            _ => {
+                println!("Error in action");
+                process::exit(1);
+            }
         }
+
+        self_state = (
+            h.get_pos(),
+            h.get_dir(),
+            h.get_speed() / h.get_speed_base(),
+            h.energy / ENERGY_MAX as f64,
+            h.eaten as f64 / CHILD_THRESH as f64
+        );
+        state.state_new = self_state; 
 
         //update main
         let msg = Msg{
@@ -337,14 +391,36 @@ pub fn main(mut h: Herbivore) {
 
         //delay
         thread::sleep(Duration::from_millis(DELAY.try_into().unwrap()));
-
-        //DEBUG
-        //println!("id: {:?}, pos: {:?}, energy: {:?}", h.get_id(), h.get_pos(), h.energy);
+        
+        first_it = false;
     }
 
     //after death
     println!("{:?} died, generation: {:?}, cause of death: {}", 
             h.get_id(),             h.gen,          h.cause_of_death);
+
+    //save states for training
+    let path = format!("src/nn/samples/herbi/{}", h.get_id());
+
+    let mut data_vec: Vec<Value> = Vec::new();
+    for state in training_states {
+        let entry_json = json!({
+            "state": state.state,
+            "mem": state.memory,
+            "action": state.action,
+            "reward": state.reward,
+            "state_new": state.state_new,
+        });
+        data_vec.push(entry_json);
+    }
+    let data_json: Value = json!({
+        "data" : Value::Array(data_vec),
+    });
+
+    std::fs::write(
+        path,
+        serde_json::to_string_pretty(&data_json).unwrap(),
+    ).unwrap();
 
     let msg = Msg{
         id:     h.get_id(),
