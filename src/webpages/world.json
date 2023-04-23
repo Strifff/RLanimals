@@ -1,31 +1,13 @@
 {
   "entries": [
     {
-      "beast": "Plant",
-      "dir": 0,
-      "fov": 0,
-      "pos_x": 220.0,
-      "pos_y": 169.0,
-      "sight_range": 0,
-      "speed": 0.0
-    },
-    {
       "beast": "Herbivore",
-      "dir": 240,
+      "dir": 90,
       "fov": 10,
-      "pos_x": 0.0,
-      "pos_y": 311.7717030131395,
+      "pos_x": 395.5082450948056,
+      "pos_y": 500.0,
       "sight_range": 316,
-      "speed": 5.178179593884357
-    },
-    {
-      "beast": "Plant",
-      "dir": 0,
-      "fov": 0,
-      "pos_x": 471.0,
-      "pos_y": 359.0,
-      "sight_range": 0,
-      "speed": 0.0
+      "speed": 8.855111545694031
     }
   ]
 }

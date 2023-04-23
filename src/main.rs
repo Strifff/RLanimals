@@ -87,13 +87,14 @@ fn main(){
                     let _ = world.remove(&msg.id);
                     //check if both herbi and carni alive
                     let mut herbi: bool = false;
-                    let mut carni: bool = false;
+                    let mut carni: bool = true; //todo change to false
                     for key in world.keys() {
                         let entry = world.get(key).unwrap();
                         if entry.0 == "Herbivore" {herbi = true}
                         if entry.0 == "Carnivore" {carni = true}
                     }
-                    if !herbi && !carni {
+                    if !herbi || !carni {
+                        println!("Simulation ended");
                         break 'sim_loop
                     }
                 }

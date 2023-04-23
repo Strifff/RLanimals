@@ -186,19 +186,19 @@ pub fn main(mut h: Herbivore) {
                                 //(msg.beast, msg.pos, msg.dir, msg.speed, msg.handle)
     let mut memory: HashMap<String, (String, (f64, f64), i32, f64, Sender<BeastUpdate>)> = HashMap::new();
 
-    let mut signals_nn = [[[0; NN_RAY_LEN]; NN_RAYS]; N_TYPES];
+    let mut signals_nn: [[[f32; 12]; 24]; 4] = [[[0.0; NN_RAY_LEN]; NN_RAYS]; N_TYPES];
 
     let mut keys_to_remove: Vec<String>=Vec::new();
 
     let mut vs = VarStore::new(tch::Device::Cpu); 
     vs.load("src/nn/weights/herbi/herbi_ac").unwrap();
-    
+
     let herbivore_ac= ActorCritic::new(
         &vs,
         (NN_RAYS*NN_RAY_LEN*N_TYPES + N_STATES_SELF) as i64,
-        4);
-    let t1 = Tensor::new();
-    let t2 = Tensor::new();
+        4
+    );
+
 
     'herb_loop: while h.alive {
         let received = &rx;
@@ -266,7 +266,7 @@ pub fn main(mut h: Herbivore) {
 
         //reset signals
         signals_nn.iter_mut().for_each(|m|
-             m.iter_mut().for_each(|m| *m = [0;NN_RAY_LEN]));
+             m.iter_mut().for_each(|m| *m = [0.0 ;NN_RAY_LEN]));
 
         add_border(&mut signals_nn, h.pos, h.dir);
 
@@ -282,7 +282,7 @@ pub fn main(mut h: Herbivore) {
             if entry.0 == "Herbivore"   {index = 2}
             if entry.0 == "Carnivore"   {index = 3}
 
-            signals_nn[index][r][d] = 1;
+            signals_nn[index][r][d] = 1.0;
 
         }
         //let x = Tensor::randn(&[2, 3, 4], (tch::Kind::Int64, tch::Device::Cpu));
@@ -296,12 +296,14 @@ pub fn main(mut h: Herbivore) {
         //input of self state
         let mut beast_state: Tensor     = Tensor::of_slice(&[h.speed_base, h.speed_curr, h.energy]);
 
-        let device = tch::Device::cuda_if_available();
-        let vs = tch::nn::VarStore::new(device);
-        //wall_tensor.print();
+        let temp = herbivore_ac.forward(
+            &wall_tensor,
+            &plant_tensor
+        );
 
-        //let model = model(&vs.root(), 4);
-
+        /*let (action_prob, value) = model.forward(&state);
+        let action = action_prob.multinomial(1, true);
+        let reward = Tensor::randn(&[], (tch::Kind::Float, tch::Device::Cpu));*/
 
         //process::exit(1);
 
@@ -431,7 +433,7 @@ fn spawn_child(parent: &impl Beast, generation: i32, main_handle: Sender<Msg>) {
     thread::spawn( move || {main(child)});
 }
 
-fn add_border(signals: &mut [[[i32; NN_RAY_LEN]; NN_RAYS]; N_TYPES], (pos_x, pos_y): (f64, f64), dir: i32) {
+fn add_border(signals: &mut [[[f32; NN_RAY_LEN]; NN_RAYS]; N_TYPES], (pos_x, pos_y): (f64, f64), dir: i32) {
     for ray in 0..=NN_RAYS-1 {
         let ray_dir = (dir + (ray * 360/NN_RAYS) as i32)%360;
         
@@ -439,7 +441,7 @@ fn add_border(signals: &mut [[[i32; NN_RAY_LEN]; NN_RAYS]; N_TYPES], (pos_x, pos
             let x = pos_x + NN_RAY_DR as f64 * (ray_dir as f64 * DEG_TO_RAD).cos() * radius as f64;
             let y = pos_y + NN_RAY_DR as f64 * (ray_dir as f64 * DEG_TO_RAD).sin() * radius as f64;
             if !in_bounds_bool(x, y) {
-                signals[0][ray][radius-1] = 1; //one-hot vector, wall == index 0
+                signals[0][ray][radius-1] = 1.0; //one-hot vector, wall == index 0
 
                 break
             }
