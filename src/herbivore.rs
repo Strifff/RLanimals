@@ -224,14 +224,13 @@ pub fn main(mut h: Herbivore) {
     'herb_loop: while h.alive {
         let received = &rx;
 
-        //reset reward
-        reward = 0.0;
- 
         world.clear();
         for msg in received.try_iter() {
             if msg.try_eat && h.alive {
                 //todo respond to carnivore
                 reward += SCORE_DIE as f64;
+                state.reward = reward;
+                training_states.push(state.clone());
                 break 'herb_loop;
             } else if msg.eat_result {
                 h.eaten += msg.eat_value;
@@ -245,11 +244,13 @@ pub fn main(mut h: Herbivore) {
                 world = msg.world.unwrap();
             }
         }
+
         state.reward = reward;
 
         //submit state 
         if !first_it {
             training_states.push(state.clone());
+            reward = 0.0;
         }
 
         //take action
@@ -331,7 +332,6 @@ pub fn main(mut h: Herbivore) {
             signals_nn[index][r][d] = 1.0;
 
         }
-        //let x = Tensor::randn(&[2, 3, 4], (tch::Kind::Int64, tch::Device::Cpu));
 
         // input of world state
         let mut wall_tensor:    Tensor    = Tensor::of_slice2(&signals_nn[0]);
@@ -342,16 +342,18 @@ pub fn main(mut h: Herbivore) {
         //input of self state
         let mut beast_state: Tensor     = Tensor::of_slice(&[h.speed_base, h.speed_curr, h.energy]);
 
+        // run nn
         let (action_prob, value) = herbivore_ac.forward(
             &wall_tensor,
             &plant_tensor
         );
 
-        let action = action_prob.multinomial(1, true);
-        state.action = i64::from(&action);
+        action = i64::from(action_prob.multinomial(1, true));
+        state.action = action;
         state.state = self_state;
+        reward += SCORE_SURVIVE as f64;
 
-        match i64::from(action) {
+        match action {
             0 => {h.set_speed1()}
             1 => {h.set_speed2()}
             2 => {h.set_speed3()}
@@ -394,8 +396,11 @@ pub fn main(mut h: Herbivore) {
         
         first_it = false;
     }
-
     //after death
+    reward += SCORE_DIE as f64;
+    state.reward = reward;
+    training_states.push(state.clone());
+
     println!("{:?} died, generation: {:?}, cause of death: {}", 
             h.get_id(),             h.gen,          h.cause_of_death);
 
@@ -441,7 +446,7 @@ pub fn main(mut h: Herbivore) {
 fn in_view(h: &Herbivore, other_pos: (f64, f64)) -> bool {
     let pos_self = h.get_pos();  // position
     let dir_self = h.get_dir();         // view direction
-    let fov_self =h.get_fov();          // field of view
+    let fov_self = h.get_fov();         // field of view
     let ros_self = h.get_ros();         // range of sight
 
     let left_dir_rad: f64 = ((dir_self+fov_self/2)%180) as f64 *3.141593/180.0;
@@ -561,7 +566,7 @@ fn ray_direction_index ((self_x, self_y): (f64, f64), self_dir: i32, (othr_x, ot
 
 
 
-type Model = Box<dyn Fn(&Tensor) -> (Tensor, Tensor)>;
+/*type Model = Box<dyn Fn(&Tensor) -> (Tensor, Tensor)>;
 
 fn model(p: &nn::Path, nact: i64) -> Model {
     let stride = |s| nn::ConvConfig { stride: s, ..Default::default() };
@@ -587,4 +592,4 @@ fn model(p: &nn::Path, nact: i64) -> Model {
         let xs = xs.to_device(device).apply(&seq);
         (xs.apply(&critic), xs.apply(&actor))
     })
-}
+}*/

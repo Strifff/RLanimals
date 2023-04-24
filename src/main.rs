@@ -5,9 +5,11 @@ mod conc;
 mod plant;
 mod A2C;
 
-use std::{thread, time::Duration, sync::mpsc, collections::HashMap, process};
+use std::fs::{self, ReadDir};
+use std::path::PathBuf;
+use std::{thread, time::Duration, time::SystemTime, sync::mpsc, collections::HashMap, process};
 use tch::{nn, nn::Module, nn::OptimizerConfig, nn::VarStore, Tensor, Kind};
-use rand::{Rng, thread_rng};
+use rand::{Rng};
 use nanoid::nanoid;
 
 use conc::{MainServer};
@@ -22,8 +24,8 @@ use crate::mpsc::{Sender/*,Receiver*/};
 const FPS: i32 = 100;
 const DELAY: i32 = 1000/FPS;
 const MAPSIZE: i32 = 500;
-const FOV: i32 = 10;
-const N_HERB: i32 = 10;
+const FOV: i32 = 50;
+const N_HERB: i32 = 5;
 const PLANT_FREQ: i32 = 1; //set value between 1..100
 
 //NN parameters
@@ -36,6 +38,10 @@ const N_STATES_SELF: usize = 2; // curr speed, energy
 //math
 const DEG_TO_RAD: f64 = 3.141593 / 180.0;
 const RAD_TO_DEG: f64 = 180.0 / 3.141593;
+
+
+const MAX_FILES: usize = 100;
+
 
 
 fn main(){
@@ -79,7 +85,6 @@ fn main(){
 
         }
 
-
         // reset world
         world.clear();
 
@@ -88,7 +93,7 @@ fn main(){
 
         //todo spawn carni
 
-        println!("Simulation started");
+        println!("Simulation started, iteration: {:?}", iteration);
         'sim_loop: loop {
             // receive beast/plant states
             let received = &rx;
@@ -112,7 +117,6 @@ fn main(){
                     }
                 }
             }
-
 
             // reciver updates from server
             let received = &server_rx;
@@ -201,15 +205,35 @@ fn spawn_herbi(main_handle: Sender<Msg>) {
 }
 
 fn train(beast: &str) {
-    /*let mut vs = VarStore::new(tch::Device::Cpu);
+    let mut vs = VarStore::new(tch::Device::Cpu);
+    let mut samples: ReadDir; 
     if beast == "Herbivore" {
         vs.load("src/nn/weights/herbi/herbi_ac").unwrap();
-
+        samples = fs::read_dir("src/nn/samples/herbi/").unwrap();
     } else if beast == "Carnivore" {
         vs.load("src/nn/weights/carni/carni_ac").unwrap();
+        samples = fs::read_dir("src/nn/samples/carni/").unwrap();
     } else {
         println!("error in train");
         process::exit(1);
+    }
+    // discard old files
+    let mut files_vec: Vec<(PathBuf, Duration)> = Vec::new();
+    for sample in samples {
+        let path = sample.as_ref().unwrap().path();
+        let time = sample.as_ref().unwrap().metadata().unwrap().created().unwrap().duration_since(SystemTime::UNIX_EPOCH).unwrap(); 
+        if path.clone().into_os_string().into_string().unwrap().contains(".DS_Store") {continue}
+        files_vec.push((path, time));
+    }
+
+    files_vec.sort_by(|(a,b), (c,d)| d.cmp(b));
+
+    if files_vec.len() > MAX_FILES {
+        for index in MAX_FILES..files_vec.len(){
+            let (path, _) = &files_vec[index];
+            let _ = fs::remove_file(path);
+            files_vec.remove(index);
+        }
     }
     
     let model = ActorCritic::new(
@@ -218,6 +242,7 @@ fn train(beast: &str) {
         7
     );
 
+    /*
     let (_, values) = model.forward(&Tensor::cat(&states, 0));
     let values = values.squeeze();
     let advantages = Tensor::cat(&rewards, 0) - values;
@@ -235,5 +260,6 @@ fn train(beast: &str) {
 
     optimizer.zero_grad();
     loss.backward();
-    optimizer.step();*/
+    optimizer.step();
+    */
 }
