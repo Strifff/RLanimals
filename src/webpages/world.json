@@ -2,93 +2,12 @@
   "entries": [
     {
       "beast": "Herbivore",
-      "dir": 135,
-      "fov": 50,
-      "pos_x": 39.6677416968324,
-      "pos_y": 402.3200234855239,
-      "sight_range": 141,
-      "speed": 5.484328317755343
-    },
-    {
-      "beast": "Plant",
-      "dir": 0,
-      "fov": 0,
-      "pos_x": 59.0,
-      "pos_y": 243.0,
-      "sight_range": 0,
-      "speed": 0.0
-    },
-    {
-      "beast": "Herbivore",
-      "dir": 90,
-      "fov": 50,
-      "pos_x": 173.4243391736807,
-      "pos_y": 497.72782728131284,
-      "sight_range": 141,
-      "speed": 2.272172718687195
-    },
-    {
-      "beast": "Herbivore",
-      "dir": 0,
-      "fov": 50,
-      "pos_x": 411.25000107013057,
-      "pos_y": 500.0,
-      "sight_range": 141,
-      "speed": 3.9978730301679386
-    },
-    {
-      "beast": "Plant",
-      "dir": 0,
-      "fov": 0,
-      "pos_x": 364.0,
-      "pos_y": 357.0,
-      "sight_range": 0,
-      "speed": 0.0
-    },
-    {
-      "beast": "Herbivore",
-      "dir": 135,
-      "fov": 50,
-      "pos_x": 0.0,
-      "pos_y": 500.0,
-      "sight_range": 141,
-      "speed": 2.5383001722587704
-    },
-    {
-      "beast": "Plant",
-      "dir": 0,
-      "fov": 0,
-      "pos_x": 71.0,
-      "pos_y": 194.0,
-      "sight_range": 0,
-      "speed": 0.0
-    },
-    {
-      "beast": "Plant",
-      "dir": 0,
-      "fov": 0,
-      "pos_x": 309.0,
-      "pos_y": 452.0,
-      "sight_range": 0,
-      "speed": 0.0
-    },
-    {
-      "beast": "Herbivore",
-      "dir": 90,
-      "fov": 50,
-      "pos_x": 282.3630129182966,
-      "pos_y": 114.0999803632095,
-      "sight_range": 141,
-      "speed": 8.906459663550358
-    },
-    {
-      "beast": "Plant",
-      "dir": 0,
-      "fov": 0,
-      "pos_x": 254.0,
-      "pos_y": 487.0,
-      "sight_range": 0,
-      "speed": 0.0
+      "dir": 240,
+      "fov": 200,
+      "pos_x": 98.95400464679621,
+      "pos_y": 129.12990550332708,
+      "sight_range": 70,
+      "speed": 1.9933365358903514
     }
   ]
 }

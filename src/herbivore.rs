@@ -28,7 +28,7 @@ const SCORE_EAT: i32 = 50;
 const SCORE_SURVIVE: i32 = 1;
 const SCORE_DIE: i32 = -100;
 
-const ENERGY_MAX: f64 = 5000.0;
+const ENERGY_MAX: f64 = 100.0;
 
 
 pub struct Herbivore {
@@ -419,7 +419,10 @@ pub fn main(mut h: Herbivore) {
         data_vec.push(entry_json);
     }
     let data_json: Value = json!({
-        "data" : Value::Array(data_vec),
+        "speed_base":   h.get_speed_base(),
+        "fov":          h.get_fov(),
+        "sight_range":  h.get_ros(),
+        "data":         Value::Array(data_vec),
     });
 
     std::fs::write(

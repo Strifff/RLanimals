@@ -8,6 +8,7 @@ mod A2C;
 use std::fs::{self, ReadDir};
 use std::path::PathBuf;
 use std::{thread, time::Duration, time::SystemTime, sync::mpsc, collections::HashMap, process};
+use serde_json::Value;
 use tch::{nn, nn::Module, nn::OptimizerConfig, nn::VarStore, Tensor, Kind};
 use rand::{Rng};
 use nanoid::nanoid;
@@ -24,9 +25,9 @@ use crate::mpsc::{Sender/*,Receiver*/};
 const FPS: i32 = 100;
 const DELAY: i32 = 1000/FPS;
 const MAPSIZE: i32 = 500;
-const FOV: i32 = 50;
-const N_HERB: i32 = 5;
-const PLANT_FREQ: i32 = 1; //set value between 1..100
+const FOV: i32 = 200;
+const N_HERB: i32 = 1;
+const PLANT_FREQ: i32 = 0; //set value between 1..100, 0 for no food
 
 //NN parameters
 const NN_RAYS: usize = 24;      // directions for the input of a beast, full circle
@@ -40,7 +41,7 @@ const DEG_TO_RAD: f64 = 3.141593 / 180.0;
 const RAD_TO_DEG: f64 = 180.0 / 3.141593;
 
 
-const MAX_FILES: usize = 100;
+const MAX_FILES: usize = 10;
 
 
 
@@ -205,18 +206,20 @@ fn spawn_herbi(main_handle: Sender<Msg>) {
 }
 
 fn train(beast: &str) {
+    let mut signals_nn: [[[f32; 12]; 24]; 4] = [[[0.0; NN_RAY_LEN]; NN_RAYS]; N_TYPES];
     let mut vs = VarStore::new(tch::Device::Cpu);
-    let mut samples: ReadDir; 
+    let mut path: String = String::from("init");
     if beast == "Herbivore" {
         vs.load("src/nn/weights/herbi/herbi_ac").unwrap();
-        samples = fs::read_dir("src/nn/samples/herbi/").unwrap();
+        //samples = fs::read_dir("src/nn/samples/herbi/").unwrap();
+        path = String::from("src/nn/samples/herbi/"); 
     } else if beast == "Carnivore" {
         vs.load("src/nn/weights/carni/carni_ac").unwrap();
-        samples = fs::read_dir("src/nn/samples/carni/").unwrap();
     } else {
         println!("error in train");
         process::exit(1);
     }
+    let mut samples: ReadDir = fs::read_dir(path.clone()).unwrap();
     // discard old files
     let mut files_vec: Vec<(PathBuf, Duration)> = Vec::new();
     for sample in samples {
@@ -229,26 +232,73 @@ fn train(beast: &str) {
     files_vec.sort_by(|(a,b), (c,d)| d.cmp(b));
 
     if files_vec.len() > MAX_FILES {
-        for index in MAX_FILES..files_vec.len(){
+        for index in MAX_FILES..(files_vec.len()-1){
             let (path, _) = &files_vec[index];
             let _ = fs::remove_file(path);
-            files_vec.remove(index);
         }
+        files_vec.clear();
     }
-    
+
     let model = ActorCritic::new(
         &vs,
         (NN_RAYS*NN_RAY_LEN*N_TYPES + N_STATES_SELF) as i64,
         7
     );
+    
+    samples = fs::read_dir(path).unwrap();
+    for sample in samples {
+        let path = sample.as_ref().unwrap().path();
+        if path.into_os_string().into_string().unwrap().contains(".DS_Store") {continue}
+        let mut data = {
+            let input = std::fs::read_to_string(sample.unwrap().path()).unwrap();
+            serde_json::from_str::<Value>(&input).unwrap()
+        };
+        let entries: serde_json::Value =
+        serde_json::from_value(data).expect("JSON was not well-formatted");
+        let fov = &entries["fov"].as_i64().unwrap();
+        let ros = &entries["sight_range"].as_i64().unwrap();
+        let speed_base = &entries["speed_base"].as_f64().unwrap();
+        let data = entries["data"].as_array().unwrap();
+
+        for entry in data {
+            let state = entry["state"].as_array().unwrap();
+                let pos_x = state[0][0].as_f64().unwrap();
+                let pos_y = state[0][1].as_f64().unwrap();
+                let dir = state[1].as_i64().unwrap();
+                let speed = state[2].as_f64().unwrap().round();
+                let energy = state[3].as_f64().unwrap();
+                let eaten = state[4].as_f64().unwrap();   
+            let state_new = entry["state_new"].as_array().unwrap();
+                let new_pos_x = state_new[0][0].as_f64().unwrap();
+                let new_pos_y = state_new[0][1].as_f64().unwrap();
+                let new_dir = state_new[1].as_i64().unwrap();
+                let new_speed = state_new[2].as_f64().unwrap().round();
+                let new_energy = state_new[3].as_f64().unwrap();
+                let new_eaten = state_new[4].as_f64().unwrap(); 
+            let mem = entry["mem"].as_array().unwrap();
+            let action = entry["action"].as_i64().unwrap();
+            let reward = entry["reward"].as_f64().unwrap();
+
+            /*println!("x: {:?}, y: {:?}, dir: {:?}, speed: {:?}, energy: {:?}, eaten: {:?}",
+                     pos_x, pos_y, dir, speed, energy, eaten);*/
+
+            
+        }
+
+        signals_nn.iter_mut().for_each(|m|
+            m.iter_mut().for_each(|m| *m = [0.0 ;NN_RAY_LEN]));
+
+    }
+
 
     /*
+    
     let (_, values) = model.forward(&Tensor::cat(&states, 0));
     let values = values.squeeze();
     let advantages = Tensor::cat(&rewards, 0) - values;
     let value_targets = Tensor::cat(&rewards, 0);
     
-
+    
     // Compute actor and critic losses
     let log_probs = model
         .actor
