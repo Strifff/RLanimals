@@ -165,7 +165,7 @@ fn read_json_loop(path: String, iteration: i32) -> Value {
         Ok(o) => {o}
         Err(e) => {
             if iteration > 10 {
-                println!("Tried to read json {:?} times, error: {:?}", iteration, e);
+                //println!("Tried to read json {:?} times, error: {:?}", iteration, e);
             }
             if iteration > 30 {
                 println!("Returned empty world");

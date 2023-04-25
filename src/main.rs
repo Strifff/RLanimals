@@ -11,7 +11,7 @@ use std::{thread, time::Duration, time::SystemTime, sync::mpsc, collections::Has
 use rand::seq::SliceRandom;
 use serde_json::Value;
 use tch::{nn, nn::Module, nn::OptimizerConfig, nn::VarStore, Tensor, Kind};
-use rand::{Rng};
+use rand::{Rng, thread_rng};
 use nanoid::nanoid;
 
 use conc::{MainServer};
@@ -26,10 +26,13 @@ use crate::mpsc::{Sender/*,Receiver*/};
 const FPS: i32 = 100;
 const DELAY: i32 = 1000/FPS;
 const MAPSIZE: i32 = 500;
-const FOV: i32 = 200;
+const MARGIN: i32 = 5;
+const FOV: i32 = 120;
 const N_HERB: i32 = 5;
-const PLANT_FREQ: i32 = 1; //set value between 1..100, 0 for no food
+const PLANT_FREQ: i32 = 3; //set value between 1..100, 0 for no food
 const PLANT_START: i32 = 5;
+const ENERGY_MAX: f64 = 2500.0;
+const CHILD_THRESH: i32 = 50;  
 
 //NN parameters
 const NN_RAYS: usize = 24;      // directions for the input of a beast, full circle
@@ -37,17 +40,16 @@ const NN_RAY_LEN: usize = 12;   // points per ray
 const NN_RAY_DR: usize = 10;    // delta-radius for each point on ray
 const N_TYPES: usize = 4;       // wall, plant, herbiv., carniv.
 const N_STATES_SELF: usize = 2; // curr speed, energy
+const GAMMA: f64 = 0.98;
+const LR: f64 = 0.0001;
 
 //math
 const DEG_TO_RAD: f64 = 3.141593 / 180.0;
 const RAD_TO_DEG: f64 = 180.0 / 3.141593;
-const GAMMA: f64 = 0.99;
-const LR: f64 = 0.001;
 
 
-const MAX_FILES: usize = 20;
-
-
+const MAX_FILES: usize = 25;
+const RETRAIN: bool = false; //& <------- IMPORTANT ---------
 
 fn main(){
 
@@ -73,10 +75,13 @@ fn main(){
     let (tx, rx) = mpsc::channel::<Msg>();
 
     // nn weights
-    let vs_herbi = VarStore::new(tch::Device::Cpu);    
-    vs_herbi.save("src/nn/weights/herbi/herbi_ac").unwrap();
-    let vs_carni = VarStore::new(tch::Device::Cpu);    
-    vs_carni.save("src/nn/weights/carni/carni_ac").unwrap();
+    if RETRAIN {
+        let vs_herbi = VarStore::new(tch::Device::Cpu);    
+        vs_herbi.save("src/nn/weights/herbi/herbi_ac").unwrap();
+        let vs_carni = VarStore::new(tch::Device::Cpu);    
+        vs_carni.save("src/nn/weights/carni/carni_ac").unwrap();
+    }
+
 
     let mut iteration = 0;
     'train_loop: loop {
@@ -100,6 +105,7 @@ fn main(){
         }
 
         println!("Simulation started, iteration: {:?}", iteration);
+        let mut iteration_sim = 0;
         'sim_loop: loop {
             // receive beast/plant states
             let received = &rx;
@@ -117,7 +123,7 @@ fn main(){
                         if entry.0 == "Herbivore" {herbi = true}
                         if entry.0 == "Carnivore" {carni = true}
                     }
-                    if !herbi || !carni {
+                    if (!herbi || !carni) && iteration_sim > 25 {
                         println!("Simulation ended");
                         break 'sim_loop
                     }
@@ -151,6 +157,7 @@ fn main(){
                     eat_value: 0,
                     response_handle: None,
                     world: Some(world_reverse.clone()),
+                    cull: false,
                 };
                 if entry.0 != "Plant" {
                     match handle.send(msg) {
@@ -179,8 +186,21 @@ fn main(){
 
             // delay
             thread::sleep(Duration::from_millis(DELAY.try_into().unwrap()));
+            iteration_sim += 1;
         }
         iteration += 1;
+        for key in world.keys() {
+            let entry = world.get(key).unwrap();
+            let cull_msg = BeastUpdate {
+                try_eat: false,
+                eat_result: false,
+                eat_value: 0,
+                response_handle: None,
+                world: None,
+                cull: true,
+            };
+            let _ = entry.6.send(cull_msg);
+        }
     }
 }
 
@@ -202,7 +222,7 @@ fn spawn_herbi(main_handle: Sender<Msg>) {
             nanoid!(),
             (rng.gen_range(0.0..MAPSIZE as f64),rng.gen_range(0.0..MAPSIZE as f64)),
             FOV,
-            2.0, //rng.gen_range(1.5..2.5),
+            1.8, //rng.gen_range(1.5..2.5),
             0, 
             main_handle.clone(),
         );
@@ -240,7 +260,7 @@ fn train(beast_type: &str) {
     files_vec.sort_by(|(a,b), (c,d)| d.cmp(b));
 
     if files_vec.len() > MAX_FILES {
-        for index in MAX_FILES..(files_vec.len()-1){
+        for index in MAX_FILES..(files_vec.len()){
             let (path, _) = &files_vec[index];
             let _ = fs::remove_file(path);
         }
@@ -278,7 +298,11 @@ fn train(beast_type: &str) {
                 let dir = state[1].as_i64().unwrap();
                 let speed = state[2].as_f64().unwrap().round();
                 let energy = state[3].as_f64().unwrap();
-                let eaten = state[4].as_f64().unwrap();   
+                let eaten = state[4].as_f64().unwrap();
+                let self_state = [
+                    (speed/speed_base) as f32, 
+                    (energy/ENERGY_MAX) as f32,
+                    (eaten/CHILD_THRESH as f64) as f32];   
             let state_new = entry["state_new"].as_array().unwrap();
                 let next_pos_x = state_new[0][0].as_f64().unwrap();
                 let next_pos_y = state_new[0][1].as_f64().unwrap();
@@ -286,7 +310,11 @@ fn train(beast_type: &str) {
                 let next_dir = state_new[1].as_i64().unwrap();
                 let next_speed = state_new[2].as_f64().unwrap().round();
                 let next_energy = state_new[3].as_f64().unwrap();
-                let next_eaten = state_new[4].as_f64().unwrap(); 
+                let next_eaten = state_new[4].as_f64().unwrap();
+                let next_self_state = [
+                    (next_speed/speed_base) as f32,
+                    (next_energy/ENERGY_MAX) as f32,
+                    (next_eaten/CHILD_THRESH as f64) as f32];   
             let mem = entry["mem"].as_array().unwrap();
             let action = entry["action"].as_i64().unwrap();
             let reward = entry["reward"].as_f64().unwrap();
@@ -307,8 +335,6 @@ fn train(beast_type: &str) {
                 let other_dir = memory[2].as_i64().unwrap();
                 let other_speed = memory[3].as_f64().unwrap();
 
-
-                
                 let d = distance_index(pos, other_pos);
                 if d > NN_RAY_LEN-1 {continue} //memory larger than vision
                 let r = ray_direction_index(pos, dir as i32, other_pos);
@@ -325,9 +351,12 @@ fn train(beast_type: &str) {
             let mut plant_tensor:   Tensor    = Tensor::of_slice2(&signals_nn[1]);
             let mut herbiv_tensor:  Tensor    = Tensor::of_slice2(&signals_nn[2]);
             let mut carniv_tensor:  Tensor    = Tensor::of_slice2(&signals_nn[3]);
+            let mut self_state_tensor: Tensor = Tensor::of_slice(&self_state);
 
             signals_nn.iter_mut().for_each(|m|
                 m.iter_mut().for_each(|m| *m = [0.0 ;NN_RAY_LEN]));
+
+            add_border(&mut signals_nn, next_pos, next_dir as i32);
 
             for memory in mem {
                 let beast_type = String::from(memory[0].as_str().unwrap());
@@ -337,8 +366,6 @@ fn train(beast_type: &str) {
                 let other_dir = memory[2].as_i64().unwrap();
                 let other_speed = memory[3].as_f64().unwrap();
 
-
-                
                 let d = distance_index(pos, other_pos);
                 if d > NN_RAY_LEN-1 {continue} //memory larger than vision
                 let r = ray_direction_index(next_pos, next_dir as i32, other_pos);
@@ -355,24 +382,21 @@ fn train(beast_type: &str) {
             let mut next_plant_tensor:   Tensor    = Tensor::of_slice2(&signals_nn[1]);
             let mut next_herbiv_tensor:  Tensor    = Tensor::of_slice2(&signals_nn[2]);
             let mut next_carniv_tensor:  Tensor    = Tensor::of_slice2(&signals_nn[3]);
+            let mut next_self_state_tensor: Tensor = Tensor::of_slice(&next_self_state);
 
-            let (action_probs, value) = model.forward(&wall_tensor, &plant_tensor);
-            let (_, next_value) = model.forward(&next_wall_tensor, &next_plant_tensor);
+            let (action_probs, value) = model.forward(&wall_tensor, &plant_tensor, &self_state_tensor);
+            let (_, next_value) = model.forward(&next_wall_tensor, &next_plant_tensor, &next_self_state_tensor);
       
             let log_probs = action_probs.log_softmax(-1, Kind::Double);
             let action_prob = log_probs.index_select(-1, &Tensor::from(action)).squeeze();
 
-            //let delta = reward + GAMMA*f64::from(next_value) - f64::from(value);
-            //let loss_actor = -f64::from(action_prob)*delta;
-            //let loss_critic = delta*delta;
-
-            //let loss = Tensor::from(loss_actor + 0.5*loss_critic);
-
             let target = Tensor::from(reward) + Tensor::from(GAMMA) * next_value - value;
 
-            // Compute the loss tensor
             let action_log_prob = log_probs.index_select(-1, &Tensor::from(action)).squeeze();
-            let loss = -(action_log_prob * target).mean(Kind::Double);
+
+            let loss_actor = -(action_log_prob * &target);
+            let loss_critic = &target*&target;
+            let loss = loss_actor + loss_critic;
 
             optimizer.zero_grad();
             loss.backward();

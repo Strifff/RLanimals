@@ -14,7 +14,7 @@ use nanoid::nanoid;
 use serde_json::{json, Value};
 
 // make environment discrete
-use crate::MAPSIZE;
+use crate::{MAPSIZE, MARGIN, ENERGY_MAX, CHILD_THRESH};
 use crate::DELAY;
 use crate::{NN_RAYS, NN_RAY_DR, NN_RAY_LEN, N_TYPES, N_STATES_SELF};
 use crate::{RAD_TO_DEG, DEG_TO_RAD};
@@ -23,14 +23,11 @@ use crate::{RAD_TO_DEG, DEG_TO_RAD};
                                 // forget objects far away
 const MEM_RADIUS: i32 = ((NN_RAY_LEN as f64 + 1.5 )*NN_RAY_DR as f64) as i32;    
 const EAT_RANGE: i32 = 50;
-const CHILD_THRESH: i32 = 50;   // food to spawn child
-const SCORE_EAT: i32 = 50;
-const SCORE_SURVIVE: i32 = 1;
-const SCORE_DIE: i32 = -100;
-const SCORE_ENERGY: f64 = -0.1;
-
-const ENERGY_MAX: f64 = 2500.0;
-
+ // food to spawn child
+const SCORE_EAT: i32 = 100;
+const SCORE_SURVIVE: i32 = 2;
+const SCORE_DIE: i32 = -500;
+const SCORE_ENERGY: f64 = -0.05;
 
 pub struct Herbivore {
     id: String,
@@ -148,10 +145,10 @@ impl Beast for Herbivore {
     }
     fn in_bounds(&self, x: f64, y: f64) -> (f64,f64) {
         let vec: Vec<f64> = vec![x,y].into_iter().map(|val| 
-            {if val > MAPSIZE as f64 {
-                MAPSIZE.clone() as f64
-            } else if val < 0 as f64 {
-                0 as f64
+            {if val + MARGIN as f64 > MAPSIZE as f64 {
+                (MAPSIZE - MARGIN) as f64
+            } else if (val - MARGIN as f64) < 0.0 {
+                (0 + MARGIN) as f64
             } else { 
                 val as f64
             }}).collect();
@@ -235,7 +232,7 @@ pub fn main(mut h: Herbivore) {
                 break 'herb_loop;
             } else if msg.eat_result {
                 h.eaten += msg.eat_value;
-                h.energy += msg.eat_value as f64 * 10.0;
+                h.energy += msg.eat_value as f64 * 5.0;
                 if h.eaten > CHILD_THRESH {
                     spawn_child(&h, h.gen, h.main_handle.clone());
                     h.eaten -= CHILD_THRESH;
@@ -301,6 +298,7 @@ pub fn main(mut h: Herbivore) {
                     eat_value: 0,
                     response_handle: Some(tx.clone()),
                     world: None,
+                    cull: false,
                 };
                 match entry.4.send(eat_msg) {
                     Ok(o) => {}     //result doesn't matter, cant unwrap
@@ -344,12 +342,17 @@ pub fn main(mut h: Herbivore) {
         let mut carniv_tensor:  Tensor    = Tensor::of_slice2(&signals_nn[3]);
 
         //input of self state
-        let mut beast_state: Tensor     = Tensor::of_slice(&[h.speed_base, h.speed_curr, h.energy]);
+        let mut beast_state_tensor: Tensor = Tensor::of_slice(&[
+            (h.get_speed() / h.get_speed_base()) as f32,
+            (h.energy / ENERGY_MAX as f64) as f32,
+            (h.eaten as f64 / CHILD_THRESH as f64) as f32
+            ]);
 
         // run nn
         let (action_prob, value) = herbivore_ac.forward(
             &wall_tensor,
-            &plant_tensor
+            &plant_tensor,
+            &beast_state_tensor
         );
 
         action = i64::from(action_prob.multinomial(1, true));

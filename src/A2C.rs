@@ -33,7 +33,7 @@ impl ActorCritic {
         let size_full = (NN_RAYS*NN_RAY_LEN) as i64;
         let size_half = (size_full as f64 * 0.5) as i64;
         //todo change size_all1 to match all input and self-state
-        let size_all1 = (size_half as f64 * 2.0 + 0.0) as i64;
+        let size_all1 = (size_half as f64 * 2.0 + 3.0) as i64;
         let size_all2 = (size_all1 as f64 * 0.75) as i64;
         let size_all3 = (size_all1 as f64 * 0.5) as i64;
 
@@ -83,12 +83,13 @@ impl ActorCritic {
         ActorCritic { wall, plant, herbi, carni, all, actor, critic }
     }
 
-    pub fn forward(&self, w: &Tensor, p: &Tensor) -> (Tensor, Tensor) {
+    pub fn forward(&self, w: &Tensor, p: &Tensor, s: &Tensor) -> (Tensor, Tensor) {
 
         let mut wall  = self.wall.forward(&w.flatten(0, 1));
         let mut plant = self.plant.forward(&p.flatten(0,1));
+        let mut state = &s.flatten(-1,0);
 
-        let mut all = tch::Tensor::cat(&[&wall, &plant], 0);
+        let mut all = tch::Tensor::cat(&[&wall, &plant, &state], 0);
 
         all = self.all.forward(&all);
         

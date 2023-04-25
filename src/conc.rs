@@ -18,6 +18,7 @@ pub struct BeastUpdate {
     pub eat_value: i32,
     pub response_handle: Option<Sender<BeastUpdate>>,
     pub world: Option<Vec<((f64, f64), String, String, i32, i32, i32, f64, Sender<BeastUpdate>)>>, 
+    pub cull: bool,
 }
 
 //todo impl Msg for many msg types enums?

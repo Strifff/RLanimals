@@ -9,7 +9,7 @@ use crate::MAPSIZE;
 use crate::DELAY;
 
 const ENERGY_LOW: i32 = 10;
-const ENERGY_HIGH: i32 = 30;
+const ENERGY_HIGH: i32 = 20;
 
 
 pub struct Plant {
@@ -90,11 +90,16 @@ pub fn main(mut p: Plant) {
                     eat_value: p.energy,
                     response_handle: None,
                     world: None,
+                    cull: false,
                 };
                 let _ = msg.response_handle.unwrap().send(response);
                 p.alive = false;
                 break 'plant_loop
             } //plant does not care about worldly things
+            if msg.cull {
+                p.alive = false;
+                break 'plant_loop
+            }
         }
 
         //delay                                
