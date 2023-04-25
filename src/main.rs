@@ -8,6 +8,7 @@ mod A2C;
 use std::fs::{self, ReadDir};
 use std::path::PathBuf;
 use std::{thread, time::Duration, time::SystemTime, sync::mpsc, collections::HashMap, process};
+use rand::seq::SliceRandom;
 use serde_json::Value;
 use tch::{nn, nn::Module, nn::OptimizerConfig, nn::VarStore, Tensor, Kind};
 use rand::{Rng};
@@ -15,7 +16,7 @@ use nanoid::nanoid;
 
 use conc::{MainServer};
 use server::Server;
-use herbivore::Herbivore;
+use herbivore::{Herbivore, distance_index, ray_direction_index, add_border};
 use plant::Plant;
 use A2C::ActorCritic;
 
@@ -26,8 +27,8 @@ const FPS: i32 = 100;
 const DELAY: i32 = 1000/FPS;
 const MAPSIZE: i32 = 500;
 const FOV: i32 = 200;
-const N_HERB: i32 = 1;
-const PLANT_FREQ: i32 = 0; //set value between 1..100, 0 for no food
+const N_HERB: i32 = 5;
+const PLANT_FREQ: i32 = 1; //set value between 1..100, 0 for no food
 
 //NN parameters
 const NN_RAYS: usize = 24;      // directions for the input of a beast, full circle
@@ -41,7 +42,7 @@ const DEG_TO_RAD: f64 = 3.141593 / 180.0;
 const RAD_TO_DEG: f64 = 180.0 / 3.141593;
 
 
-const MAX_FILES: usize = 10;
+const MAX_FILES: usize = 50;
 
 
 
@@ -205,15 +206,15 @@ fn spawn_herbi(main_handle: Sender<Msg>) {
     }
 }
 
-fn train(beast: &str) {
+fn train(beast_type: &str) {
     let mut signals_nn: [[[f32; 12]; 24]; 4] = [[[0.0; NN_RAY_LEN]; NN_RAYS]; N_TYPES];
     let mut vs = VarStore::new(tch::Device::Cpu);
     let mut path: String = String::from("init");
-    if beast == "Herbivore" {
+    if beast_type == "Herbivore" {
         vs.load("src/nn/weights/herbi/herbi_ac").unwrap();
         //samples = fs::read_dir("src/nn/samples/herbi/").unwrap();
         path = String::from("src/nn/samples/herbi/"); 
-    } else if beast == "Carnivore" {
+    } else if beast_type == "Carnivore" {
         vs.load("src/nn/weights/carni/carni_ac").unwrap();
     } else {
         println!("error in train");
@@ -246,7 +247,7 @@ fn train(beast: &str) {
     );
     
     samples = fs::read_dir(path).unwrap();
-    for sample in samples {
+    'file_loop: for sample in samples {
         let path = sample.as_ref().unwrap().path();
         if path.into_os_string().into_string().unwrap().contains(".DS_Store") {continue}
         let mut data = {
@@ -258,36 +259,110 @@ fn train(beast: &str) {
         let fov = &entries["fov"].as_i64().unwrap();
         let ros = &entries["sight_range"].as_i64().unwrap();
         let speed_base = &entries["speed_base"].as_f64().unwrap();
-        let data = entries["data"].as_array().unwrap();
+        let data: &mut Vec<Value> = &mut entries["data"].as_array().unwrap().clone();
+        let mut rng = rand::thread_rng();
+        data.shuffle(&mut rng);
 
-        for entry in data {
+        'data_point_loop: for entry in data {
             let state = entry["state"].as_array().unwrap();
                 let pos_x = state[0][0].as_f64().unwrap();
                 let pos_y = state[0][1].as_f64().unwrap();
+                let pos = (pos_x, pos_y);
                 let dir = state[1].as_i64().unwrap();
                 let speed = state[2].as_f64().unwrap().round();
                 let energy = state[3].as_f64().unwrap();
                 let eaten = state[4].as_f64().unwrap();   
             let state_new = entry["state_new"].as_array().unwrap();
-                let new_pos_x = state_new[0][0].as_f64().unwrap();
-                let new_pos_y = state_new[0][1].as_f64().unwrap();
-                let new_dir = state_new[1].as_i64().unwrap();
-                let new_speed = state_new[2].as_f64().unwrap().round();
-                let new_energy = state_new[3].as_f64().unwrap();
-                let new_eaten = state_new[4].as_f64().unwrap(); 
+                let next_pos_x = state_new[0][0].as_f64().unwrap();
+                let next_pos_y = state_new[0][1].as_f64().unwrap();
+                let next_pos = (next_pos_x, next_pos_y);
+                let next_dir = state_new[1].as_i64().unwrap();
+                let next_speed = state_new[2].as_f64().unwrap().round();
+                let next_energy = state_new[3].as_f64().unwrap();
+                let next_eaten = state_new[4].as_f64().unwrap(); 
             let mem = entry["mem"].as_array().unwrap();
             let action = entry["action"].as_i64().unwrap();
             let reward = entry["reward"].as_f64().unwrap();
 
+            println!("reward: {:?}, speed: {:?}", reward, speed);
+
             /*println!("x: {:?}, y: {:?}, dir: {:?}, speed: {:?}, energy: {:?}, eaten: {:?}",
                      pos_x, pos_y, dir, speed, energy, eaten);*/
+        
+            signals_nn.iter_mut().for_each(|m|
+                m.iter_mut().for_each(|m| *m = [0.0 ;NN_RAY_LEN]));
 
-            
+            add_border(&mut signals_nn, pos, dir as i32);
+
+            for memory in mem {
+                let beast_type = String::from(memory[0].as_str().unwrap());
+                let other_pos_x = memory[1][0].as_f64().unwrap();
+                let other_pos_y = memory[1][1].as_f64().unwrap();
+                let other_pos = (other_pos_x, other_pos_y);
+                let other_dir = memory[2].as_i64().unwrap();
+                let other_speed = memory[3].as_f64().unwrap();
+
+
+                
+                let d = distance_index(pos, other_pos);
+                if d > NN_RAY_LEN-1 {continue} //memory larger than vision
+                let r = ray_direction_index(pos, dir as i32, other_pos);
+                let mut index = 100; // make it crash if error
+                if beast_type == "Wall"        {index = 0}
+                if beast_type == "Plant"       {index = 1}
+                if beast_type == "Herbivore"   {index = 2}
+                if beast_type == "Carnivore"   {index = 3}
+
+                signals_nn[index][r][d] = 1.0;
+            }
+
+            let mut wall_tensor:    Tensor    = Tensor::of_slice2(&signals_nn[0]);
+            let mut plant_tensor:   Tensor    = Tensor::of_slice2(&signals_nn[1]);
+            let mut herbiv_tensor:  Tensor    = Tensor::of_slice2(&signals_nn[2]);
+            let mut carniv_tensor:  Tensor    = Tensor::of_slice2(&signals_nn[3]);
+
+            signals_nn.iter_mut().for_each(|m|
+                m.iter_mut().for_each(|m| *m = [0.0 ;NN_RAY_LEN]));
+
+            for memory in mem {
+                let beast_type = String::from(memory[0].as_str().unwrap());
+                let other_pos_x = memory[1][0].as_f64().unwrap();
+                let other_pos_y = memory[1][1].as_f64().unwrap();
+                let other_pos = (other_pos_x, other_pos_y);
+                let other_dir = memory[2].as_i64().unwrap();
+                let other_speed = memory[3].as_f64().unwrap();
+
+
+                
+                let d = distance_index(pos, other_pos);
+                if d > NN_RAY_LEN-1 {continue} //memory larger than vision
+                let r = ray_direction_index(next_pos, next_dir as i32, other_pos);
+                let mut index = 100; // make it crash if error
+                if beast_type == "Wall"        {index = 0}
+                if beast_type == "Plant"       {index = 1}
+                if beast_type == "Herbivore"   {index = 2}
+                if beast_type == "Carnivore"   {index = 3}
+
+                signals_nn[index][r][d] = 1.0;
+            }
+
+            let mut next_wall_tensor:    Tensor    = Tensor::of_slice2(&signals_nn[0]);
+            let mut next_plant_tensor:   Tensor    = Tensor::of_slice2(&signals_nn[1]);
+            let mut next_herbiv_tensor:  Tensor    = Tensor::of_slice2(&signals_nn[2]);
+            let mut next_carniv_tensor:  Tensor    = Tensor::of_slice2(&signals_nn[3]);
+
+            let (action_prob, value) = model.forward(&wall_tensor, &plant_tensor);
+            let action = i64::from(action_prob.multinomial(1, true));
+
         }
 
-        signals_nn.iter_mut().for_each(|m|
-            m.iter_mut().for_each(|m| *m = [0.0 ;NN_RAY_LEN]));
+    }
 
+    if beast_type == "Herbivore" {
+        vs.save("src/nn/weights/herbi/herbi_ac").unwrap();
+    }
+    if beast_type == "Carnivore" {
+        vs.save("src/nn/weights/carni/carni_ac").unwrap();
     }
 
 

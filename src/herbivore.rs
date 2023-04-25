@@ -27,8 +27,9 @@ const CHILD_THRESH: i32 = 50;   // food to spawn child
 const SCORE_EAT: i32 = 50;
 const SCORE_SURVIVE: i32 = 1;
 const SCORE_DIE: i32 = -100;
+const SCORE_ENERGY: f64 = -0.1;
 
-const ENERGY_MAX: f64 = 100.0;
+const ENERGY_MAX: f64 = 1000.0;
 
 
 pub struct Herbivore {
@@ -244,6 +245,9 @@ pub fn main(mut h: Herbivore) {
                 world = msg.world.unwrap();
             }
         }
+        
+        let energy_reward = h.get_speed()*h.get_speed() * SCORE_ENERGY;
+        reward += energy_reward;
 
         state.reward = reward;
 
@@ -517,7 +521,7 @@ fn spawn_child(parent: &impl Beast, generation: i32, main_handle: Sender<Msg>) {
     thread::spawn( move || {main(child)});
 }
 
-fn add_border(signals: &mut [[[f32; NN_RAY_LEN]; NN_RAYS]; N_TYPES], (pos_x, pos_y): (f64, f64), dir: i32) {
+pub fn add_border(signals: &mut [[[f32; NN_RAY_LEN]; NN_RAYS]; N_TYPES], (pos_x, pos_y): (f64, f64), dir: i32) {
     for ray in 0..=NN_RAYS-1 {
         let ray_dir = (dir + (ray * 360/NN_RAYS) as i32)%360;
         
@@ -543,7 +547,7 @@ fn in_bounds_bool( x: f64, y: f64) -> bool {
     false
 }
 
-fn distance_index((self_x, self_y): (f64, f64), (othr_x, othr_y): (f64, f64)) -> usize {
+pub fn distance_index((self_x, self_y): (f64, f64), (othr_x, othr_y): (f64, f64)) -> usize {
     let dx = self_x - othr_x;
     let dy = self_y - othr_y;
     let d = (dx.powf(2.0) + dy.powf(2.0)).sqrt();
@@ -551,7 +555,7 @@ fn distance_index((self_x, self_y): (f64, f64), (othr_x, othr_y): (f64, f64)) ->
     (d/(NN_RAY_DR as f64)).round() as usize
 }
 
-fn ray_direction_index ((self_x, self_y): (f64, f64), self_dir: i32, (othr_x, othr_y): (f64, f64)) -> usize {
+pub fn ray_direction_index ((self_x, self_y): (f64, f64), self_dir: i32, (othr_x, othr_y): (f64, f64)) -> usize {
     let dx = othr_x - self_x;
     let dy = othr_y - self_y;
 
