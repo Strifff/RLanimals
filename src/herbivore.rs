@@ -29,7 +29,7 @@ const SCORE_SURVIVE: i32 = 1;
 const SCORE_DIE: i32 = -100;
 const SCORE_ENERGY: f64 = -0.1;
 
-const ENERGY_MAX: f64 = 1000.0;
+const ENERGY_MAX: f64 = 2500.0;
 
 
 pub struct Herbivore {

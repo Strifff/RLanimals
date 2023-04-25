@@ -29,6 +29,7 @@ const MAPSIZE: i32 = 500;
 const FOV: i32 = 200;
 const N_HERB: i32 = 5;
 const PLANT_FREQ: i32 = 1; //set value between 1..100, 0 for no food
+const PLANT_START: i32 = 5;
 
 //NN parameters
 const NN_RAYS: usize = 24;      // directions for the input of a beast, full circle
@@ -40,9 +41,11 @@ const N_STATES_SELF: usize = 2; // curr speed, energy
 //math
 const DEG_TO_RAD: f64 = 3.141593 / 180.0;
 const RAD_TO_DEG: f64 = 180.0 / 3.141593;
+const GAMMA: f64 = 0.99;
+const LR: f64 = 0.001;
 
 
-const MAX_FILES: usize = 50;
+const MAX_FILES: usize = 20;
 
 
 
@@ -82,9 +85,6 @@ fn main(){
             //train
             train("Herbivore");
 
-
-            //delete old states
-
         }
 
         // reset world
@@ -94,6 +94,10 @@ fn main(){
         spawn_herbi(tx.clone());
 
         //todo spawn carni
+
+        for _ in 1..=PLANT_START {
+            spawn_plant(tx.clone());
+        }
 
         println!("Simulation started, iteration: {:?}", iteration);
         'sim_loop: loop {
@@ -198,7 +202,7 @@ fn spawn_herbi(main_handle: Sender<Msg>) {
             nanoid!(),
             (rng.gen_range(0.0..MAPSIZE as f64),rng.gen_range(0.0..MAPSIZE as f64)),
             FOV,
-            rng.gen_range(1.0..3.0),
+            2.0, //rng.gen_range(1.5..2.5),
             0, 
             main_handle.clone(),
         );
@@ -207,6 +211,7 @@ fn spawn_herbi(main_handle: Sender<Msg>) {
 }
 
 fn train(beast_type: &str) {
+    
     let mut signals_nn: [[[f32; 12]; 24]; 4] = [[[0.0; NN_RAY_LEN]; NN_RAYS]; N_TYPES];
     let mut vs = VarStore::new(tch::Device::Cpu);
     let mut path: String = String::from("init");
@@ -220,6 +225,8 @@ fn train(beast_type: &str) {
         println!("error in train");
         process::exit(1);
     }
+    let mut optimizer = nn::Adam::default().build(&vs, LR).unwrap();
+
     let mut samples: ReadDir = fs::read_dir(path.clone()).unwrap();
     // discard old files
     let mut files_vec: Vec<(PathBuf, Duration)> = Vec::new();
@@ -283,8 +290,6 @@ fn train(beast_type: &str) {
             let mem = entry["mem"].as_array().unwrap();
             let action = entry["action"].as_i64().unwrap();
             let reward = entry["reward"].as_f64().unwrap();
-
-            println!("reward: {:?}, speed: {:?}", reward, speed);
 
             /*println!("x: {:?}, y: {:?}, dir: {:?}, speed: {:?}, energy: {:?}, eaten: {:?}",
                      pos_x, pos_y, dir, speed, energy, eaten);*/
@@ -351,8 +356,27 @@ fn train(beast_type: &str) {
             let mut next_herbiv_tensor:  Tensor    = Tensor::of_slice2(&signals_nn[2]);
             let mut next_carniv_tensor:  Tensor    = Tensor::of_slice2(&signals_nn[3]);
 
-            let (action_prob, value) = model.forward(&wall_tensor, &plant_tensor);
-            let action = i64::from(action_prob.multinomial(1, true));
+            let (action_probs, value) = model.forward(&wall_tensor, &plant_tensor);
+            let (_, next_value) = model.forward(&next_wall_tensor, &next_plant_tensor);
+      
+            let log_probs = action_probs.log_softmax(-1, Kind::Double);
+            let action_prob = log_probs.index_select(-1, &Tensor::from(action)).squeeze();
+
+            //let delta = reward + GAMMA*f64::from(next_value) - f64::from(value);
+            //let loss_actor = -f64::from(action_prob)*delta;
+            //let loss_critic = delta*delta;
+
+            //let loss = Tensor::from(loss_actor + 0.5*loss_critic);
+
+            let target = Tensor::from(reward) + Tensor::from(GAMMA) * next_value - value;
+
+            // Compute the loss tensor
+            let action_log_prob = log_probs.index_select(-1, &Tensor::from(action)).squeeze();
+            let loss = -(action_log_prob * target).mean(Kind::Double);
+
+            optimizer.zero_grad();
+            loss.backward();
+            optimizer.step();
 
         }
 
