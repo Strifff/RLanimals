@@ -7,8 +7,8 @@ use crate::mpsc::{Sender/*,Receiver*/};
 use crate::{NN_RAYS, NN_RAY_DR, NN_RAY_LEN, N_TYPES};
 
 pub struct ActorCritic {
-    wall: nn::Sequential,
-    plant: nn::Sequential,
+    pub wall: nn::Sequential,
+    pub plant: nn::Sequential,
     herbi: nn::Sequential,
     carni: nn::Sequential,
     all: nn::Sequential,
@@ -43,6 +43,7 @@ impl ActorCritic {
         let size_critic1 = (size_all3 as f64 * 0.75) as i64;
         let size_critic2 = (size_all3 as f64 * 0.5) as i64;
 
+        
         let wall = nn::seq()
             .add(nn::linear(vs.root(), size_full, size_half,  Default::default()))
             .add_fn(|xs| xs.relu());
