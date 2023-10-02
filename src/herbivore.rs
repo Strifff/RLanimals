@@ -212,6 +212,7 @@ pub fn main(mut h: Herbivore) {
 
     let mut keys_to_remove: Vec<String> = Vec::new();
 
+    /*
     let mut vs = VarStore::new(tch::Device::Cpu);
     vs.load("src/nn/weights/herbi/herbi_ac").unwrap();
 
@@ -219,7 +220,10 @@ pub fn main(mut h: Herbivore) {
         &vs,
         (NN_RAYS * NN_RAY_LEN * N_TYPES + N_STATES_SELF) as i64,
         7,
-    );
+    );*/
+    let path = "src/genes/herbi/tester";
+
+    let genalg_net = genAlg::genAlgoNN::new(path.to_string());
 
     let mut training_states: Vec<States> = Vec::new();
 
@@ -382,12 +386,9 @@ pub fn main(mut h: Herbivore) {
         );*/
 
         // gen algorithm
-        let action_prob = genAlg::forward(signals_nn);
-
-
-        //action = action_prob.softmax(-1, Kind::Float).multinomial(1, true).into_kind(INT64_CPU);
-        //herbivore_ac.vs.get();
-        //action = i64::from(action_prob.multinomial(1, true));
+        let action_prob = genalg_net.forward(&plant_tensor);
+        action = i64::from(action_prob.multinomial(1, true));
+        
         state.action = action;
         state.state = self_state;
         reward += SCORE_SURVIVE as f64;

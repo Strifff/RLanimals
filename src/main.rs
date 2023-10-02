@@ -14,12 +14,15 @@ use rand::seq::SliceRandom;
 use rand::{thread_rng, Rng};
 use serde_json::Value;
 use std::fs::{self, ReadDir};
+use std::io::stdout;
 use std::path::PathBuf;
-use std::{collections::HashMap, process, sync::mpsc, thread, time::Duration, time::SystemTime};
+use std::{collections::HashMap, process, sync::mpsc, thread, time::Duration, time::SystemTime, time::Instant};
+use tch::nn::init;
 use tch::Device;
 use tch::{nn, nn::Module, nn::OptimizerConfig, nn::VarStore, Kind, Tensor};
 
 use conc::MainServer;
+use genAlg::{choose_parents, genAlgoNN, generate_offspring, init_models_ws_bs};
 use herbivore::{add_border, distance_index, ray_direction_index, Herbivore};
 use plant::Plant;
 use server::Server;
@@ -50,11 +53,10 @@ const LR: f64 = 0.0001;
 const ACTIONS: usize = 7;
 
 // genetic algorithm
-const MAX_WEIGHT_BIAS: usize = 5;
+const MAX_WEIGHT_BIAS: usize = 1;
 const MUTATION_RATE: f64 = 0.01;
 const START_SPARCITY: f64 = 0.25;
-
-
+const CHOOSE_MAX_FIT: f64 = 0.8;
 
 //math
 const DEG_TO_RAD: f64 = 3.141593 / 180.0;
@@ -113,15 +115,13 @@ fn main() {
             Err(err) => eprintln!("Error loading model: {}", err),
         }
 
-
         let test_model = ActorCritic::new(
             &vs,
             (NN_RAYS * NN_RAY_LEN * N_TYPES + N_STATES_SELF) as i64,
             7,
         );
-        
 
-        let zero_input: [f32; NN_RAY_LEN*NN_RAYS] = [0.0; NN_RAY_LEN*NN_RAYS];
+        let zero_input: [f32; NN_RAY_LEN * NN_RAYS] = [0.0; NN_RAY_LEN * NN_RAYS];
 
         let zero_tensor = Tensor::of_slice(&zero_input);
 
@@ -133,36 +133,68 @@ fn main() {
         let one_hot_tensor = Tensor::of_slice(&one_hot);
 
         let wall_weight = test_model.wall.forward(&one_hot_tensor);
-    
+
         //wall_weight.print();
 
-        let mut linear_layer =  nn::linear(vs.root(), 5, 3,  Default::default());
-    
+        let mut linear_layer = nn::linear(vs.root(), 5, 3, Default::default());
+
         // Define custom weights and biases (example values).
         let custom_weights_data = [
             1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0, 9.0, 10.0, 11.0, 12.0, 13.0, 14.0, 15.0,
         ];
         let custom_biases_data = [0.0, 0.0, 0.0];
-    
+
         // Create tensors for custom weights and biases.
         let custom_weights: Tensor = Tensor::of_slice(&custom_weights_data).reshape(&[3, 5]);
         let custom_biases: Tensor = Tensor::of_slice(&custom_biases_data);
-    
+
         // Set the custom weights and biases for the linear layer.
         //linear_layer.set_parameters(&nn::VarStore::new(Device::Cpu), &custom_weights, &custom_biases);
         linear_layer.bs = Some(custom_biases);
         linear_layer.ws = custom_weights;
-    
+
         // Create an input tensor for inference (example input).
         let input_data: [f64; 5] = [0.0, 0.0, 0.0, 0.0, 1.0];
         let input = Tensor::of_slice(&input_data);
-    
+
         // Perform inference using the modified linear layer.
         let output = linear_layer.forward(&input);
-    
+
         // Print the output.
         println!("Output: {:?}", output);
-    
+
+        let inputs = ["plant"];
+
+        //init_models_ws_bs(inputs, "herbi");
+
+        let parents = choose_parents("herbi");
+
+        //let offspring = generate_offspring(parents.0, parents.1, "herbi");
+
+        let genalg_net = genAlg::genAlgoNN::new("reee".to_string());
+
+        let input: [f32; NN_RAYS * NN_RAY_LEN] = [0.0; NN_RAYS * NN_RAY_LEN];
+
+        
+        let input_tensor = Tensor::of_slice(&input);
+
+        println!("Input: {:?}", input_tensor);
+
+        let start_time = Instant::now();
+        
+        let output = genalg_net.forward(&input_tensor);
+
+        let elapsed = start_time.elapsed();
+        let elapsed_us = elapsed.as_micros();
+
+        println!("Elapsed: {:?}", elapsed_us);
+
+        println!("Output: {:?}", output);
+
+        let action = i64::from(output.multinomial(1, true));
+
+        println!("Action: {:?}", action);
+
         process::exit(1);
     }
 
