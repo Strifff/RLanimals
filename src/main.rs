@@ -6,29 +6,38 @@ mod herbivore;
 mod plant;
 mod server;
 
+extern crate rand;
 extern crate tch;
 
 use nanoid::nanoid;
 use ndarray::Array2;
 use rand::seq::SliceRandom;
 use rand::{thread_rng, Rng};
+use rand_distr::{Distribution, Normal};
 use serde_json::Value;
+use std::char::MAX;
 use std::fs::{self, ReadDir};
 use std::io::stdout;
 use std::path::PathBuf;
-use std::{collections::HashMap, process, sync::mpsc, thread, time::Duration, time::SystemTime, time::Instant};
+use std::{
+    collections::HashMap, process, sync::mpsc, thread, time::Duration, time::Instant,
+    time::SystemTime,
+};
 use tch::nn::init;
 use tch::Device;
 use tch::{nn, nn::Module, nn::OptimizerConfig, nn::VarStore, Kind, Tensor};
 
 use conc::MainServer;
-use genAlg::{choose_parents, genAlgoNN, generate_offspring, init_models_ws_bs};
+use genAlg::{
+    choose_parents, genAlgoNN, generate_offspring, init_models_ws_bs, truncate_gene_files,
+};
 use herbivore::{add_border, distance_index, ray_direction_index, Herbivore};
 use plant::Plant;
 use server::Server;
 use A2C::ActorCritic;
 
 use crate::conc::{BeastUpdate, Msg};
+use crate::genAlg::{create_new_ws_bs, init_values_normal, init_values_uniform, get_files};
 use crate::mpsc::Sender;
 
 const FPS: i32 = 100;
@@ -54,15 +63,23 @@ const ACTIONS: usize = 7;
 
 // genetic algorithm
 const MAX_WEIGHT_BIAS: usize = 1;
-const MUTATION_RATE: f64 = 0.01;
+const MUTATION_RATE: f32 = 0.001;
 const START_SPARCITY: f64 = 0.25;
 const CHOOSE_MAX_FIT: f64 = 0.8;
+const NEW_GENES: bool = true;
+const GENES: usize = 100;
+const GENES_MAX: usize = 1000;
+const NORMAL_MEAN: f64 = 0.0;
+const NORMAL_STDDEV: f64 = 1.0;
+const NEW_FILES: usize = 50;
+const MAX_FILES: usize = 250;
+const DEBUG : bool = true;  //& <------- IMPORTANT ---------
 
 //math
 const DEG_TO_RAD: f64 = 3.141593 / 180.0;
 const RAD_TO_DEG: f64 = 180.0 / 3.141593;
 
-const MAX_FILES: usize = 25;
+//const MAX_FILES: usize = 25;
 const RETRAIN: bool = false; //& <------- IMPORTANT ---------
 
 fn main() {
@@ -106,7 +123,7 @@ fn main() {
     }
 
     // weights and biases extraction test
-    if true {
+    if DEBUG {
         //tch::manual_seed(1234);
         let mut vs = nn::VarStore::new(tch::Device::Cpu);
         //vs.load("src/nn/weights/herbi/herbi_ac").unwrap();
@@ -165,35 +182,46 @@ fn main() {
 
         let inputs = ["plant"];
 
-        //init_models_ws_bs(inputs, "herbi");
+        //init_models_ws_bs(inputs, "herbi", init_values_uniform);
+        //init_models_ws_bs(inputs, "carni", init_values_normal);
 
         let parents = choose_parents("herbi");
 
         //let offspring = generate_offspring(parents.0, parents.1, "herbi");
 
-        let genalg_net = genAlg::genAlgoNN::new("reee".to_string());
+        //let path = "src/genes/herbi/tester";
+        let files = get_files("src/genes/herbi/");
+        let file = files[2].file_name().to_str().unwrap().to_string();
+        let path = format!("src/genes/herbi/{}", file);
+
+        let genalg_net = genAlg::genAlgoNN::new(path);
 
         let input: [f32; NN_RAYS * NN_RAY_LEN] = [0.0; NN_RAYS * NN_RAY_LEN];
 
-        
         let input_tensor = Tensor::of_slice(&input);
 
         println!("Input: {:?}", input_tensor);
 
         let start_time = Instant::now();
-        
+
         let output = genalg_net.forward(&input_tensor);
 
         let elapsed = start_time.elapsed();
         let elapsed_us = elapsed.as_micros();
 
-        println!("Elapsed: {:?}", elapsed_us);
+        println!("Elapsed: {:?} us", elapsed_us);
 
         println!("Output: {:?}", output);
 
         let action = i64::from(output.multinomial(1, true));
 
         println!("Action: {:?}", action);
+
+        //create_new_ws_bs(10, "herbi");
+
+        //truncate_gene_files("carni", MAX_FILES as i64);
+        truncate_gene_files("herbi", 0);
+        truncate_gene_files("carni", 0);
 
         process::exit(1);
     }
@@ -203,7 +231,7 @@ fn main() {
         if iteration != 0 {
             //todo train networks
             //train
-            train("Herbivore");
+            //train("Herbivore");
         }
 
         // reset world
@@ -332,6 +360,7 @@ fn main() {
             };
             let _ = entry.6.send(cull_msg);
         }
+        truncate_gene_files("herbi", MAX_FILES as i64);
     }
 }
 

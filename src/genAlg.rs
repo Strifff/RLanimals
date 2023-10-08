@@ -1,10 +1,17 @@
 use rand::{seq::index, Rng};
+use rand_distr::{Distribution, Normal};
 use serde_json::{json, Value};
-use tch::{nn, nn::Module, nn::OptimizerConfig, nn::VarStore, Kind, Tensor};
+use tch::{
+    nn,
+    nn::VarStore,
+    nn::{init, OptimizerConfig},
+    nn::{Module, Optimizer},
+    Kind, Tensor,
+};
 
 use crate::{
-    ACTIONS, CHOOSE_MAX_FIT, MAX_WEIGHT_BIAS, MUTATION_RATE, NN_RAYS, NN_RAY_DR, NN_RAY_LEN,
-    N_TYPES, START_SPARCITY,
+    ACTIONS, CHOOSE_MAX_FIT, MAX_FILES, MAX_WEIGHT_BIAS, MUTATION_RATE, NN_RAYS, NN_RAY_DR,
+    NN_RAY_LEN, NORMAL_MEAN, NORMAL_STDDEV, N_TYPES, START_SPARCITY,
 };
 
 const SIZE_FULL: usize = (NN_RAYS * NN_RAY_LEN);
@@ -20,8 +27,17 @@ pub struct genAlgoNN {
     //pub actor: nn::Sequential,
     //pub critic: nn::Sequential,
 }
+pub fn apply_op<F>(x: f32, operation: F) -> f32
+where
+    F: Fn(f32) -> f32,
+{
+    operation(x)
+}
 
-pub fn init_models_ws_bs(inputs: [&str; 1], for_model: &str) {
+pub fn init_models_ws_bs<F>(inputs: [&str; 1], for_model: &str, op: F)
+where
+    F: Fn(f32) -> f32,
+{
     let mut rng = rand::thread_rng();
 
     let mut first_layer_ws = [0.0; NN_RAYS * NN_RAY_LEN * SIZE_HALF];
@@ -47,17 +63,33 @@ pub fn init_models_ws_bs(inputs: [&str; 1], for_model: &str) {
     });
 
     for input in inputs.iter() {
-        first_layer_bs.iter_mut().for_each(|x| init_values(x));
-        first_layer_ws.iter_mut().for_each(|x| init_values(x));
+        first_layer_bs
+            .iter_mut()
+            .for_each(|x| *x = apply_op(*x, &op));
+        first_layer_ws
+            .iter_mut()
+            .for_each(|x| *x = apply_op(*x, &op));
 
-        second_layer_bs.iter_mut().for_each(|x| init_values(x));
-        second_layer_ws.iter_mut().for_each(|x| init_values(x));
+        second_layer_bs
+            .iter_mut()
+            .for_each(|x| *x = apply_op(*x, &op));
+        second_layer_ws
+            .iter_mut()
+            .for_each(|x| *x = apply_op(*x, &op));
 
-        third_layer_bs.iter_mut().for_each(|x| init_values(x));
-        third_layer_ws.iter_mut().for_each(|x| init_values(x));
+        third_layer_bs
+            .iter_mut()
+            .for_each(|x| *x = apply_op(*x, &op));
+        third_layer_ws
+            .iter_mut()
+            .for_each(|x| *x = apply_op(*x, &op));
 
-        fourth_layer_bs.iter_mut().for_each(|x| init_values(x));
-        fourth_layer_ws.iter_mut().for_each(|x| init_values(x));
+        fourth_layer_bs
+            .iter_mut()
+            .for_each(|x| *x = apply_op(*x, &op));
+        fourth_layer_ws
+            .iter_mut()
+            .for_each(|x| *x = apply_op(*x, &op));
 
         data_json[input] = json!({
             "first_layer_ws": first_layer_ws.to_vec(),
@@ -73,43 +105,69 @@ pub fn init_models_ws_bs(inputs: [&str; 1], for_model: &str) {
     std::fs::write(path, serde_json::to_string_pretty(&data_json).unwrap()).unwrap();
 }
 
-pub fn init_values(x: &mut f32) {
+pub fn create_new_ws_bs(nr: i64, for_model: &str) {
+    let inputs = ["plant"];
+
+    for _ in 0..nr {
+        init_models_ws_bs(inputs, for_model, init_values_uniform);
+        init_models_ws_bs(inputs, for_model, init_values_normal);
+    }
+}
+
+pub fn truncate_gene_files(for_model: &str, max_files: i64) {
+    let path = format!("src/genes/{}/", for_model);
+    let files = get_files(&path);
+    let mut file_table: Vec<(f64, String)> = Vec::new();
+
+    for file in files {
+        //let path = file.as_ref().unwrap().path();
+        let path = file.path();
+        let file = read_JSON(path.to_str().unwrap());
+        let fitness = file["fitness"].as_f64().unwrap();
+
+        let path_string = path.to_str().unwrap().to_string();
+        file_table.push((fitness, path_string));
+    }
+
+    file_table.sort_by(|b, a| a.0.partial_cmp(&b.0).unwrap());
+
+    for i in (max_files as i64)..file_table.len() as i64 {
+        std::fs::remove_file(file_table[i as usize].1.clone()).unwrap();
+    }
+}
+
+pub fn init_values_uniform(x: f32) -> f32 {
     let mut rng = rand::thread_rng();
 
     if rng.gen_range(0.0..1.0) > START_SPARCITY {
-        let sign = rng.gen_range(0..2);
-        let mut val = rng.gen_range(0.0..MAX_WEIGHT_BIAS as f32);
-        if sign == 0 {
-            *x = val;
-        } else {
-            *x = -val;
-        }
+        let mut val = rng.gen_range(-(MAX_WEIGHT_BIAS as f32)..MAX_WEIGHT_BIAS as f32);
+        return val;
     } else {
-        *x = 0.0;
+        return 0.0;
     }
+}
+
+pub fn init_values_normal(x: f32) -> f32 {
+    let mut rng = rand::thread_rng();
+
+    let mean = NORMAL_MEAN;
+    let std_deviation = NORMAL_STDDEV;
+    let normal = Normal::new(mean, std_deviation).unwrap();
+    let random_number = rng.sample(normal);
+
+    random_number as f32
 }
 
 pub fn choose_parents(for_model: &str) -> (String, String) {
     let mut rng = rand::thread_rng();
 
     let path = format!("src/genes/{}/", for_model);
-    let files: Vec<_> = std::fs::read_dir(path).unwrap().collect();
-    let path1 = files[rng.gen_range(0..files.len())]
-        .as_ref()
-        .unwrap()
-        .path();
-    let path2 = files[rng.gen_range(0..files.len())]
-        .as_ref()
-        .unwrap()
-        .path();
-    let path3 = files[rng.gen_range(0..files.len())]
-        .as_ref()
-        .unwrap()
-        .path();
-    let path4 = files[rng.gen_range(0..files.len())]
-        .as_ref()
-        .unwrap()
-        .path();
+    let files = get_files(&path);
+
+    let path1 = files[rng.gen_range(0..files.len())].path();
+    let path2 = files[rng.gen_range(0..files.len())].path();
+    let path3 = files[rng.gen_range(0..files.len())].path();
+    let path4 = files[rng.gen_range(0..files.len())].path();
 
     let parent1 = read_JSON(path1.to_str().unwrap());
     let parent2 = read_JSON(path2.to_str().unwrap());
@@ -161,20 +219,57 @@ pub fn choose_parents(for_model: &str) -> (String, String) {
 
 pub fn read_JSON(path: &str) -> serde_json::Value {
     let mut data = {
-        let input = std::fs::read_to_string(path).unwrap();
-        serde_json::from_str::<Value>(&input).unwrap()
+        //let input = std::fs::read_to_string(path).unwrap();
+        let input = match std::fs::read_to_string(path) {
+            Ok(data) => data,
+            Err(e) => {
+                println!("Error: {}", e);
+                println!("Path: {}", path);
+                std::process::exit(1);
+            }
+        };
+        match serde_json::from_str::<Value>(&input) {
+            Ok(data) => data,
+            Err(e) => {
+                // remove dead files
+                println!("Error: {}", e);
+                println!("Path: {}", path);
+                std::fs::remove_file(path).unwrap();
+                std::process::exit(1);
+            }
+        }
+        //serde_json::from_str::<Value>(&input).unwrap()
     };
     serde_json::from_value(data).expect("JSON was not well-formatted")
 }
 
-pub fn generate_offspring(path1: String, path2: String, for_model: &str) -> String {
+pub fn get_files(path: &str) -> Vec<std::fs::DirEntry> {
+    let files: Vec<_> = std::fs::read_dir(path)
+        .unwrap()
+        .filter_map(|entry| {
+            let file_name = entry
+                .as_ref()
+                .ok()?
+                .file_name()
+                .to_string_lossy()
+                .into_owned();
+            if !file_name.contains("DS_Store") {
+                Some(entry.unwrap())
+            } else {
+                None
+            }
+        })
+        .collect();
+    files
+}
+
+pub fn generate_offspring(path1: String, path2: String, for_model: &str, mutate: bool) -> String {
     let mut rng = rand::thread_rng();
 
     let parent1 = read_JSON(path1.as_str());
     let parent2 = read_JSON(path2.as_str());
 
     let cut = rng.gen_range(0.0..1.0);
-    println!("cut: {}", cut);
 
     let inputs = ["plant"];
 
@@ -216,6 +311,7 @@ pub fn generate_offspring(path1: String, path2: String, for_model: &str) -> Stri
         let fc4_ws_len = parent1_fc4_ws.len();
         let fc4_bs_len = parent1_fc4_bs.len();
 
+        // splice parent genes
         let mut child_fc1_ws = Vec::new();
         let mut cut_index = (fc1_ws_len as f32 * cut) as usize;
         child_fc1_ws.extend_from_slice(&parent1_fc1_ws[0..cut_index]);
@@ -256,6 +352,22 @@ pub fn generate_offspring(path1: String, path2: String, for_model: &str) -> Stri
         child_fc4_bs.extend_from_slice(&parent1_fc4_bs[0..cut_index]);
         child_fc4_bs.extend_from_slice(&parent2_fc4_bs[cut_index..fc4_bs_len]);
 
+        //mutate
+        if mutate {
+            child_fc1_ws = mutate_gene(child_fc1_ws);
+            child_fc1_bs = mutate_gene(child_fc1_bs);
+
+            child_fc2_ws = mutate_gene(child_fc2_ws);
+            child_fc2_bs = mutate_gene(child_fc2_bs);
+
+            child_fc3_ws = mutate_gene(child_fc3_ws);
+            child_fc3_bs = mutate_gene(child_fc3_bs);
+
+            child_fc4_ws = mutate_gene(child_fc4_ws);
+            child_fc4_bs = mutate_gene(child_fc4_bs);
+        }
+
+        // write to json
         child[input] = json!({
             "first_layer_ws": child_fc1_ws,
             "first_layer_bs": child_fc1_bs,
@@ -271,24 +383,42 @@ pub fn generate_offspring(path1: String, path2: String, for_model: &str) -> Stri
     let path = format!("src/genes/{}/{}", for_model, nanoid::nanoid!());
 
     // todo uncomment
-    //std::fs::write(&path, serde_json::to_string_pretty(&child).unwrap()).unwrap();
+    std::fs::write(&path, serde_json::to_string_pretty(&child).unwrap()).unwrap();
 
     path
 }
+
+pub fn get_child_model(for_model: &str) -> (genAlgoNN, String) {
+    let (parent1, parent2) = choose_parents(for_model);
+
+    let child = generate_offspring(parent1, parent2, for_model, true);
+
+    let child_model = genAlgoNN::new(child.clone());
+
+    (child_model, child)
+}
+
+pub fn mutate_gene(mut gene: Vec<Value>) -> Vec<Value> {
+    let mut rng = rand::thread_rng();
+
+    let gen_length = gene.len();
+
+    for mutations in 0..(gen_length as f32 * MUTATION_RATE) as i64 {
+        let mut index = rng.gen_range(0..gen_length);
+        let mut value = gene[index].as_f64().unwrap();
+
+        value = value + rng.gen_range(-(MAX_WEIGHT_BIAS as f64)..MAX_WEIGHT_BIAS as f64);
+
+        gene[index] = json!(value);
+    }
+
+    gene
+}
 impl genAlgoNN {
     pub fn new(path: String) -> genAlgoNN {
-        println!("size full: {}", SIZE_FULL);
-        println!("size half: {}", SIZE_HALF);
-        println!("size qtr: {}", SIZE_QTR);
-
         let file = read_JSON(&path);
 
         let plant_values = file["plant"].clone();
-
-        println!("first layer {:?}", file["first_layer"]);
-        println!("second layer {:?}", file["second_layer"]);
-        println!("third layer {:?}", file["third_layer"]);
-        println!("fourth layer {:?}", file["fourth_layer"]);
 
         let vs = VarStore::new(tch::Device::Cpu);
 
@@ -322,25 +452,29 @@ impl genAlgoNN {
 
         let mut plant_fc1_ws_tensor = Tensor::of_slice(
             &serde_json::from_value::<Vec<f32>>(plant_values["first_layer_ws"].clone()).unwrap(),
-        ).reshape(&[144, 288]);
+        )
+        .reshape(&[144, 288]);
         let mut plant_fc1_bs_tensor = Tensor::of_slice(
             &serde_json::from_value::<Vec<f32>>(plant_values["first_layer_bs"].clone()).unwrap(),
         );
         let mut plant_fc2_ws_tensor = Tensor::of_slice(
             &serde_json::from_value::<Vec<f32>>(plant_values["second_layer_ws"].clone()).unwrap(),
-        ).reshape(&[72, 144]);
+        )
+        .reshape(&[72, 144]);
         let mut plant_fc2_bs_tensor = Tensor::of_slice(
             &serde_json::from_value::<Vec<f32>>(plant_values["second_layer_bs"].clone()).unwrap(),
         );
         let mut plant_fc3_ws_tensor = Tensor::of_slice(
             &serde_json::from_value::<Vec<f32>>(plant_values["third_layer_ws"].clone()).unwrap(),
-        ).reshape(&[72, 72]);
+        )
+        .reshape(&[72, 72]);
         let mut plant_fc3_bs_tensor = Tensor::of_slice(
             &serde_json::from_value::<Vec<f32>>(plant_values["third_layer_bs"].clone()).unwrap(),
         );
         let mut plant_fc4_ws_tensor = Tensor::of_slice(
             &serde_json::from_value::<Vec<f32>>(plant_values["fourth_layer_ws"].clone()).unwrap(),
-        ).reshape(&[7, 72]);
+        )
+        .reshape(&[7, 72]);
         let mut plant_fc4_bs_tensor = Tensor::of_slice(
             &serde_json::from_value::<Vec<f32>>(plant_values["fourth_layer_bs"].clone()).unwrap(),
         );
@@ -362,13 +496,12 @@ impl genAlgoNN {
             .add(plant_fc3)
             .add_fn(|xs| xs.relu())
             .add(plant_fc4)
-            //.add_fn(|xs| xs.relu());
             .add_fn(|xs| xs.softmax(-1, Kind::Float));
 
         genAlgoNN { plant }
     }
     pub fn forward(&self, p: &Tensor) -> Tensor {
-        let mut plant = self.plant.forward(&p);
+        let mut plant = self.plant.forward(&p.view([1, SIZE_FULL as i64]));
         plant
     }
 }

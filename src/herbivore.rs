@@ -6,7 +6,7 @@ use tch::kind::{FLOAT_CPU, INT64_CPU};
 use tch::{nn, nn::Module, nn::OptimizerConfig, nn::VarStore, Kind, Tensor};
 
 use crate::conc::{BeastUpdate, Msg};
-use crate::genAlg;
+use crate::genAlg::{self, get_child_model, read_JSON};
 use crate::mpsc::Sender;
 use crate::A2C::{ActorCritic, States};
 use nanoid::nanoid;
@@ -23,12 +23,12 @@ use crate::{NN_RAYS, NN_RAY_DR, NN_RAY_LEN, N_STATES_SELF, N_TYPES};
 //todo memory range 1.5x vision range, same amount of steps
 // forget objects far away
 const MEM_RADIUS: i32 = ((NN_RAY_LEN as f64 + 1.5) * NN_RAY_DR as f64) as i32;
-const EAT_RANGE: i32 = 50;
+const EAT_RANGE: i32 = 25;
 // food to spawn child
-const SCORE_EAT: i32 = 100;
-const SCORE_SURVIVE: i32 = 2;
+const SCORE_EAT: i32 = 50;
+const SCORE_SURVIVE: i32 = 1;
 const SCORE_DIE: i32 = -500;
-const SCORE_ENERGY: f64 = -0.05;
+const SCORE_ENERGY: f64 = -0.10;
 
 pub struct Herbivore {
     id: String,
@@ -221,9 +221,12 @@ pub fn main(mut h: Herbivore) {
         (NN_RAYS * NN_RAY_LEN * N_TYPES + N_STATES_SELF) as i64,
         7,
     );*/
-    let path = "src/genes/herbi/tester";
+    
+    let mut net_and_path = get_child_model("herbi");
+    let mut genalg_net = net_and_path.0;
+    let path = net_and_path.1;
 
-    let genalg_net = genAlg::genAlgoNN::new(path.to_string());
+    let mut life_time_reward = 0.0;
 
     let mut training_states: Vec<States> = Vec::new();
 
@@ -251,6 +254,7 @@ pub fn main(mut h: Herbivore) {
             if msg.try_eat && h.alive {
                 //todo respond to carnivore
                 reward += SCORE_DIE as f64;
+                life_time_reward += SCORE_DIE as f64;
                 state.reward = reward;
                 training_states.push(state.clone());
                 break 'herb_loop;
@@ -262,6 +266,7 @@ pub fn main(mut h: Herbivore) {
                     h.eaten -= CHILD_THRESH;
                 }
                 reward += SCORE_EAT as f64;
+                life_time_reward += SCORE_EAT as f64;
             } else {
                 world = msg.world.unwrap();
             }
@@ -269,6 +274,7 @@ pub fn main(mut h: Herbivore) {
 
         let energy_reward = h.get_speed() * h.get_speed() * SCORE_ENERGY;
         reward += energy_reward;
+        life_time_reward += energy_reward;
 
         state.reward = reward;
 
@@ -388,10 +394,11 @@ pub fn main(mut h: Herbivore) {
         // gen algorithm
         let action_prob = genalg_net.forward(&plant_tensor);
         action = i64::from(action_prob.multinomial(1, true));
-        
+
         state.action = action;
         state.state = self_state;
         reward += SCORE_SURVIVE as f64;
+        life_time_reward += SCORE_SURVIVE as f64;
 
         match action {
             0 => h.set_speed1(),
@@ -438,15 +445,22 @@ pub fn main(mut h: Herbivore) {
     }
     //after death
     reward += SCORE_DIE as f64;
+    life_time_reward += SCORE_DIE as f64;
     state.reward = reward;
     training_states.push(state.clone());
 
     println!(
-        "{:?} died, generation: {:?}, cause of death: {}",
+        "{:?} died, generation: {:?}, cause of death: {}, fitness: {}",
         h.get_id(),
         h.gen,
-        h.cause_of_death
+        h.cause_of_death,
+        life_time_reward
     );
+
+    //save fitness 
+    let mut file = read_JSON(&path);
+    file["fitness"] = json!(life_time_reward);
+    std::fs::write(&path, serde_json::to_string_pretty(&file).unwrap()).unwrap();
 
     //save states for training
     let path = format!("src/nn/samples/herbi/{}", h.get_id());
@@ -469,7 +483,8 @@ pub fn main(mut h: Herbivore) {
         "data":         Value::Array(data_vec),
     });
 
-    std::fs::write(path, serde_json::to_string_pretty(&data_json).unwrap()).unwrap();
+    // save samples for training
+    //std::fs::write(path, serde_json::to_string_pretty(&data_json).unwrap()).unwrap();
 
     let msg = Msg {
         id: h.get_id(),
