@@ -29,7 +29,8 @@ use tch::{nn, nn::Module, nn::OptimizerConfig, nn::VarStore, Kind, Tensor};
 
 use conc::MainServer;
 use genAlg::{
-    choose_parents, genAlgoNN, generate_offspring, init_models_ws_bs, truncate_gene_files,
+    choose_parents, count_children, genAlgoNN, generate_offspring, get_fitness, init_models_ws_bs,
+    read_JSON, truncate_gene_files,
 };
 use herbivore::{add_border, distance_index, ray_direction_index, Herbivore};
 use plant::Plant;
@@ -37,7 +38,9 @@ use server::Server;
 use A2C::ActorCritic;
 
 use crate::conc::{BeastUpdate, Msg};
-use crate::genAlg::{create_new_ws_bs, init_values_normal, init_values_uniform, get_files};
+use crate::genAlg::{
+    create_new_ws_bs, fitness_graph, get_files, init_values_normal, init_values_uniform,
+};
 use crate::mpsc::Sender;
 
 const FPS: i32 = 100;
@@ -46,7 +49,7 @@ const MAPSIZE: i32 = 500;
 const MARGIN: i32 = 5;
 const FOV: i32 = 120;
 const N_HERB: i32 = 5;
-const PLANT_FREQ: i32 = 3; //set value between 1..100, 0 for no food
+const PLANT_FREQ: i32 = 2; //set value between 1..100, 0 for no food
 const PLANT_START: i32 = 5;
 const ENERGY_MAX: f64 = 2500.0;
 const CHILD_THRESH: i32 = 50;
@@ -71,9 +74,9 @@ const GENES: usize = 100;
 const GENES_MAX: usize = 1000;
 const NORMAL_MEAN: f64 = 0.0;
 const NORMAL_STDDEV: f64 = 1.0;
-const NEW_FILES: usize = 50;
-const MAX_FILES: usize = 250;
-const DEBUG : bool = true;  //& <------- IMPORTANT ---------
+const NEW_FILES: usize = 25;
+const MAX_FILES: usize = 100;
+const DEBUG: bool = true; //& <------- IMPORTANT ---------
 
 //math
 const DEG_TO_RAD: f64 = 3.141593 / 180.0;
@@ -138,18 +141,18 @@ fn main() {
             7,
         );
 
-        let zero_input: [f32; NN_RAY_LEN * NN_RAYS] = [0.0; NN_RAY_LEN * NN_RAYS];
+        //let zero_input: [f32; NN_RAY_LEN * NN_RAYS] = [0.0; NN_RAY_LEN * NN_RAYS];
 
-        let zero_tensor = Tensor::of_slice(&zero_input);
+        //let zero_tensor = Tensor::of_slice(&zero_input);
 
-        let wall_biases = test_model.wall.forward(&zero_tensor);
+        //let wall_biases = test_model.wall.forward(&zero_tensor);
 
-        let mut one_hot = zero_input;
-        one_hot[0] = 1.0;
+        //let mut one_hot = zero_input;
+        //one_hot[0] = 1.0;
 
-        let one_hot_tensor = Tensor::of_slice(&one_hot);
+        //let one_hot_tensor = Tensor::of_slice(&one_hot);
 
-        let wall_weight = test_model.wall.forward(&one_hot_tensor);
+        //let wall_weight = test_model.wall.forward(&one_hot_tensor);
 
         //wall_weight.print();
 
@@ -159,70 +162,71 @@ fn main() {
         let custom_weights_data = [
             1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0, 9.0, 10.0, 11.0, 12.0, 13.0, 14.0, 15.0,
         ];
-        let custom_biases_data = [0.0, 0.0, 0.0];
+        //let custom_biases_data = [0.0, 0.0, 0.0];
 
         // Create tensors for custom weights and biases.
-        let custom_weights: Tensor = Tensor::of_slice(&custom_weights_data).reshape(&[3, 5]);
-        let custom_biases: Tensor = Tensor::of_slice(&custom_biases_data);
+        //let custom_weights: Tensor = Tensor::of_slice(&custom_weights_data).reshape(&[3, 5]);
+        //let custom_biases: Tensor = Tensor::of_slice(&custom_biases_data);
 
         // Set the custom weights and biases for the linear layer.
         //linear_layer.set_parameters(&nn::VarStore::new(Device::Cpu), &custom_weights, &custom_biases);
-        linear_layer.bs = Some(custom_biases);
-        linear_layer.ws = custom_weights;
+        //linear_layer.bs = Some(custom_biases);
+        //linear_layer.ws = custom_weights;
 
         // Create an input tensor for inference (example input).
-        let input_data: [f64; 5] = [0.0, 0.0, 0.0, 0.0, 1.0];
-        let input = Tensor::of_slice(&input_data);
+        //let input_data: [f64; 5] = [0.0, 0.0, 0.0, 0.0, 1.0];
+        //let input = Tensor::of_slice(&input_data);
 
         // Perform inference using the modified linear layer.
-        let output = linear_layer.forward(&input);
+        //let output = linear_layer.forward(&input);
 
         // Print the output.
-        println!("Output: {:?}", output);
+        //println!("Output: {:?}", output);
 
         let inputs = ["plant"];
 
         //init_models_ws_bs(inputs, "herbi", init_values_uniform);
         //init_models_ws_bs(inputs, "carni", init_values_normal);
 
-        let parents = choose_parents("herbi");
+        //let parents = choose_parents("herbi");
 
         //let offspring = generate_offspring(parents.0, parents.1, "herbi");
 
         //let path = "src/genes/herbi/tester";
-        let files = get_files("src/genes/herbi/");
-        let file = files[2].file_name().to_str().unwrap().to_string();
-        let path = format!("src/genes/herbi/{}", file);
+        //let files = get_files("src/genes/herbi/");
+        //let file = files[2].file_name().to_str().unwrap().to_string();
+        //let path = format!("src/genes/herbi/{}", file);
 
-        let genalg_net = genAlg::genAlgoNN::new(path);
+        //let genalg_net = genAlg::genAlgoNN::new(path);
 
-        let input: [f32; NN_RAYS * NN_RAY_LEN] = [0.0; NN_RAYS * NN_RAY_LEN];
+        //let input: [f32; NN_RAYS * NN_RAY_LEN] = [0.0; NN_RAYS * NN_RAY_LEN];
 
-        let input_tensor = Tensor::of_slice(&input);
+        //let input_tensor = Tensor::of_slice(&input);
 
-        println!("Input: {:?}", input_tensor);
+        //println!("Input: {:?}", input_tensor);
 
-        let start_time = Instant::now();
+        //let start_time = Instant::now();
 
-        let output = genalg_net.forward(&input_tensor);
+        //let output = genalg_net.forward(&input_tensor);
 
-        let elapsed = start_time.elapsed();
-        let elapsed_us = elapsed.as_micros();
+        //let elapsed = start_time.elapsed();
+        //let elapsed_us = elapsed.as_micros();
 
-        println!("Elapsed: {:?} us", elapsed_us);
+        //println!("Elapsed: {:?} us", elapsed_us);
 
-        println!("Output: {:?}", output);
+        //println!("Output: {:?}", output);
 
-        let action = i64::from(output.multinomial(1, true));
+        //let action = i64::from(output.multinomial(1, true));
 
-        println!("Action: {:?}", action);
+        //println!("Action: {:?}", action);
 
-        //create_new_ws_bs(10, "herbi");
+        
 
         //truncate_gene_files("carni", MAX_FILES as i64);
         truncate_gene_files("herbi", 0);
         truncate_gene_files("carni", 0);
 
+        create_new_ws_bs(NEW_FILES, "herbi");
         process::exit(1);
     }
 
@@ -360,7 +364,10 @@ fn main() {
             };
             let _ = entry.6.send(cull_msg);
         }
+        let delta_children_herbi = count_children("herbi");
         truncate_gene_files("herbi", MAX_FILES as i64);
+        let fitness_herbi = get_fitness("herbi");
+        fitness_graph("herbi", fitness_herbi, delta_children_herbi, "Tanh");
     }
 }
 

@@ -23,12 +23,12 @@ use crate::{NN_RAYS, NN_RAY_DR, NN_RAY_LEN, N_STATES_SELF, N_TYPES};
 //todo memory range 1.5x vision range, same amount of steps
 // forget objects far away
 const MEM_RADIUS: i32 = ((NN_RAY_LEN as f64 + 1.5) * NN_RAY_DR as f64) as i32;
-const EAT_RANGE: i32 = 25;
+const EAT_RANGE: i32 = 15;
 // food to spawn child
 const SCORE_EAT: i32 = 50;
 const SCORE_SURVIVE: i32 = 1;
 const SCORE_DIE: i32 = -500;
-const SCORE_ENERGY: f64 = -0.10;
+const SCORE_ENERGY: f64 = -0.20;
 
 pub struct Herbivore {
     id: String,

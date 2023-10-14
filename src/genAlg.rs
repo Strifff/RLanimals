@@ -1,3 +1,5 @@
+use std::path;
+
 use rand::{seq::index, Rng};
 use rand_distr::{Distribution, Normal};
 use serde_json::{json, Value};
@@ -102,10 +104,11 @@ where
             "fourth_layer_bs": fourth_layer_bs.to_vec(),
         });
     }
-    std::fs::write(path, serde_json::to_string_pretty(&data_json).unwrap()).unwrap();
+    std::fs::write(&path, serde_json::to_string_pretty(&data_json).unwrap()).unwrap();
+    println!("Created new model: {}", path);
 }
 
-pub fn create_new_ws_bs(nr: i64, for_model: &str) {
+pub fn create_new_ws_bs(nr: usize, for_model: &str) {
     let inputs = ["plant"];
 
     for _ in 0..nr {
@@ -411,9 +414,45 @@ pub fn mutate_gene(mut gene: Vec<Value>) -> Vec<Value> {
 
         gene[index] = json!(value);
     }
-
     gene
 }
+
+pub fn count_children(for_model: &str) -> usize {
+    let path = format!("src/genes/{}/", for_model);
+    let files = get_files(&path);
+    if files.len() as i64 - MAX_FILES as i64 > 0 {
+        files.len() - MAX_FILES
+    } else {
+        0
+    }
+}
+
+pub fn get_fitness(for_model: &str) -> f64 {
+    let path = format!("src/genes/{}/", for_model);
+    let files = get_files(&path);
+    let mut total_fitness: f64 = 0.0;
+    for file in files {
+        let filename = file.file_name().to_str().unwrap().to_string();
+        let subpath = format!("{}{}", path, filename);
+        let json = read_JSON(&subpath);
+        let fitness = json["fitness"].as_f64().unwrap();
+        total_fitness += fitness;
+    }
+    total_fitness /= MAX_FILES as f64;
+    println!("Average fitness: {:?} for {}.", total_fitness, for_model);
+    total_fitness
+}
+
+pub fn fitness_graph(for_model: &str, fitness: f64, delta_child_count: usize, function: &str) {
+    let path = format!("src/webpages/fitness_graph.json");
+    let mut json = serde_json::from_str::<Value>(&std::fs::read_to_string(&path).unwrap()).unwrap();
+    let mut data = json[for_model][function].as_array_mut().unwrap();
+    let prev_child_count = data[data.len() - 1][0].as_i64().unwrap() as usize;
+    let child_count = prev_child_count + delta_child_count;
+    data.push(json!([child_count, fitness]));
+    std::fs::write(&path, serde_json::to_string_pretty(&json).unwrap()).unwrap();
+}
+
 impl genAlgoNN {
     pub fn new(path: String) -> genAlgoNN {
         let file = read_JSON(&path);
@@ -490,11 +529,20 @@ impl genAlgoNN {
 
         let plant = nn::seq()
             .add(plant_fc1)
-            .add_fn(|xs| xs.relu())
+            .add_fn(|xs| xs.tanh())
+            //.add_fn(|xs| xs.sigmoid())
+            //.add_fn(|xs| xs.relu())
+
             .add(plant_fc2)
-            .add_fn(|xs| xs.relu())
+            //.add_fn(|xs| xs.sigmoid())
+            //.add_fn(|xs| xs.relu())
+            .add_fn(|xs| xs.tanh())
+            
             .add(plant_fc3)
-            .add_fn(|xs| xs.relu())
+            //.add_fn(|xs| xs.sigmoid())
+            //.add_fn(|xs| xs.relu())
+            .add_fn(|xs| xs.tanh())
+
             .add(plant_fc4)
             .add_fn(|xs| xs.softmax(-1, Kind::Float));
 
